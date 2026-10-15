@@ -116,6 +116,83 @@ describe("rendered with default answers", () => {
   });
 });
 
+describe("hardened CI", () => {
+  let repo;
+  const workflow = () => readFileSync(join(repo, ".github/workflows/check.yml"), "utf8");
+  const runCheck = () => execFileSync("npm", ["run", "check"], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES });
+  before(() => {
+    repo = render({ repo_name: "demo-skills", description: "Demo." });
+    execFileSync("npm", ["ci"], { cwd: repo, stdio: "inherit", timeout: FIVE_MINUTES });
+  });
+
+  test("pins every action reference by commit SHA", () => {
+    const uses = [...workflow().matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)/gm)].map((m) => m[1]);
+    assert.ok(uses.length > 0);
+    for (const ref of uses) assert.match(ref, /^[\w.-]+\/[\w.-]+(\/[\w./-]+)?@[0-9a-f]{40}$/, ref);
+  });
+
+  test("denies permissions at the top level and scopes them per job", () => {
+    assert.match(workflow(), /^permissions: \{\}$/m);
+    assert.match(workflow(), /^ {4}permissions:\n {6}contents: read$/m);
+  });
+
+  test("runs unfiltered and is callable from another workflow", () => {
+    const text = workflow();
+    assert.match(text, /^ {2}workflow_call:/m);
+    assert.match(text, /^ {2}pull_request:/m);
+    assert.match(text, /^ {2}push:/m);
+    assert.doesNotMatch(text, /^\s*(paths|paths-ignore|branches|branches-ignore|tags):/m);
+  });
+
+  test("runs the repository's own check", () => {
+    assert.match(workflow(), /run: npm run check$/m);
+    assert.match(workflow(), /run: npm ci$/m);
+  });
+
+  test("fails when generated output is stale", () => {
+    const file = join(repo, "skills/hello/SKILL.md");
+    const original = readFileSync(file, "utf8");
+    writeFileSync(file, `${original}\nhand edit\n`);
+    try {
+      assert.throws(runCheck);
+    } finally {
+      writeFileSync(file, original);
+    }
+    runCheck();
+  });
+
+  test("the repository check rejects an unpinned action", () => {
+    const file = join(repo, ".github/workflows/check.yml");
+    const original = workflow();
+    writeFileSync(file, original.replace(/@[0-9a-f]{40}/, "@v4"));
+    try {
+      assert.throws(runCheck);
+    } finally {
+      writeFileSync(file, original);
+    }
+    runCheck();
+  });
+
+  test("the repository check rejects missing top-level permissions", () => {
+    const file = join(repo, ".github/workflows/check.yml");
+    const original = workflow();
+    writeFileSync(file, original.replace(/^permissions: \{\}\n/m, ""));
+    try {
+      assert.throws(runCheck);
+    } finally {
+      writeFileSync(file, original);
+    }
+    runCheck();
+  });
+
+  test("the repository check has no dependencies", () => {
+    const script = readFileSync(join(repo, "scripts/check-repo.mjs"), "utf8");
+    for (const [, specifier] of script.matchAll(/(?:from|import\()\s*["']([^"']+)["']/g)) {
+      assert.match(specifier, /^node:/, specifier);
+    }
+  });
+});
+
 describe("rendered with no answers at all", () => {
   test("takes repo_name from the destination folder and passes its own check", () => {
     const repo = render({}, "bare-skills");
