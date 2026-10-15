@@ -21,7 +21,7 @@ function scratchDir() {
 
 // Render from a plain copy of the working tree so the result never depends on
 // git tags, HEAD or uncommitted changes in this checkout.
-function render(data, destName) {
+function render(data, destName, extraArgs = []) {
   const source = scratchDir();
   cpSync(join(templateRoot, "copier.yml"), join(source, "copier.yml"));
   cpSync(join(templateRoot, "template"), join(source, "template"), { recursive: true });
@@ -32,11 +32,22 @@ function render(data, destName) {
   // the command-line parser first.
   const dataFile = join(scratchDir(), "answers.json");
   writeFileSync(dataFile, JSON.stringify(data));
-  execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", "--data-file", dataFile, source, dest], {
-    stdio: "inherit",
+  execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", ...extraArgs, "--data-file", dataFile, source, dest], {
+    stdio: extraArgs.length ? ["ignore", "ignore", "pipe"] : "inherit",
     timeout: FIVE_MINUTES,
   });
   return dest;
+}
+
+// Renders with tasks skipped, so only Copier's own prompt-time validation can
+// reject the answers, never the later `npm run generate`, and checks that the
+// rejection names the expected question.
+function assertRejected(question, overrides) {
+  const answers = { repo_name: "demo-skills", description: "Demo.", ...overrides };
+  assert.throws(
+    () => render(answers, undefined, ["--skip-tasks"]),
+    (error) => String(error.stderr).includes(`Validation error for question '${question}'`),
+  );
 }
 
 // What CI will run in a fresh checkout: a clean install from the committed
@@ -158,7 +169,7 @@ describe("invalid answers", () => {
   for (const question of ["description", "author_name", "author_url"]) {
     for (const [label, value] of [["empty", ""], ["whitespace-only", "   "]]) {
       test(`${question} that is ${label} is rejected`, () => {
-        assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", [question]: value }));
+        assertRejected(question, { [question]: value });
       });
     }
   }
@@ -166,7 +177,7 @@ describe("invalid answers", () => {
   for (const question of ["description", "author_name", "author_url", "keywords"]) {
     for (const [label, value] of [["escape", "bad\u001bvalue"], ["backspace", "bad\bvalue"], ["newline", "bad\nvalue"]]) {
       test(`${question} containing ${label} is rejected`, () => {
-        assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", [question]: value }));
+        assertRejected(question, { [question]: value });
       });
     }
   }
@@ -179,13 +190,13 @@ describe("invalid answers", () => {
     ["placeholder_skill", "Hello World"],
   ]) {
     test(`${question} ${JSON.stringify(value).slice(0, 20)} is rejected`, () => {
-      assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", [question]: value }));
+      assertRejected(question, { [question]: value });
     });
   }
 
   for (const github_owner of ['bad"owner', "acme--tools", "-acme", "acme-", "a".repeat(40)]) {
     test(`github_owner ${JSON.stringify(github_owner).slice(0, 20)} is rejected`, () => {
-      assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", github_owner }));
+      assertRejected("github_owner", { github_owner });
     });
   }
 });
