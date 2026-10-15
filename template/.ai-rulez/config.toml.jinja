@@ -1,8 +1,13 @@
+{#- TOML basic string. Not `tojson`: that emits surrogate-pair escapes for
+    characters outside the BMP (emoji), which TOML rejects. -#}
+{%- macro q(value) -%}
+"{{ value | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}"
+{%- endmacro -%}
 # ai-rulez source of truth for this repo's skills.
 # Edit files under .ai-rulez/, then run `npm run generate`.
 # Docs: https://github.com/Goldziher/ai-rulez
 version = "5.0"
-name = {{ display_name | tojson }}
+name = {{ q(display_name) }}
 # Generated files are committed; .gitignore is not touched.
 gitignore = false
 
@@ -13,26 +18,26 @@ gitignore = false
 [plugin]
 name = "{{ repo_name }}"
 version_from = "package.json"
-description = {{ description | tojson }}
+description = {{ q(description) }}
 repository = "{{ repo_url }}"
-keywords = {{ keywords_json | tojson }}
+keywords = [{% for keyword in keywords_json %}{{ q(keyword) }}{% if not loop.last %}, {% endif %}{% endfor %}]
 runtimes = ["claude", "codex"]
 category = "Productivity"
 content_root = ".ai-rulez"
 provenance_headers = false
 
 [plugin.author]
-name = {{ author_name | tojson }}
-url = {{ author_url | tojson }}
+name = {{ q(author_name) }}
+url = {{ q(author_url) }}
 
 [plugin.interface]
-display_name = {{ display_name | tojson }}
-short_description = {{ description | tojson }}
+display_name = {{ q(display_name) }}
+short_description = {{ q(description) }}
 category = "Development"
 capabilities = ["Read", "Write"]
 default_prompt = ["Use the {{ placeholder_skill }} skill."]
-long_description = {{ description | tojson }}
-developer_name = {{ author_name | tojson }}
+long_description = {{ q(description) }}
+developer_name = {{ q(author_name) }}
 
 # Single-plugin catalogs point at the repository root ("./").
 [plugin.codex]

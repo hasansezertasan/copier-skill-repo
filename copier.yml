@@ -40,8 +40,8 @@ github_owner:
   default: hasansezertasan
   help: GitHub user or organization that owns the repository
   validator: >-
-    {% if not github_owner | regex_search('^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$') %}
-    Use letters, digits and single hyphens, as GitHub names do.
+    {% if github_owner | length > 39 or not github_owner | regex_search('^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$') %}
+    Use up to 39 letters, digits and single hyphens, as GitHub names do.
     {% endif %}
 
 license:

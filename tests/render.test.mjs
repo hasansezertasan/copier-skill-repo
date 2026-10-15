@@ -105,7 +105,7 @@ describe("rendered with non-default answers", () => {
   before(() => {
     repo = render({
       repo_name: "acme-widget-skills",
-      description: "Skills for widgets.",
+      description: 'Skills for widgets 😀 with "quotes" and a \\ backslash.',
       placeholder_skill: "widget-check",
       github_owner: "acme",
       author_name: "Acme Dev",
@@ -122,6 +122,8 @@ describe("rendered with non-default answers", () => {
   test("threads owner and author answers into the manifests", () => {
     const plugin = readJson(repo, ".claude-plugin/plugin.json");
     assert.equal(plugin.repository, "https://github.com/acme/acme-widget-skills");
+    assert.equal(plugin.description, 'Skills for widgets 😀 with "quotes" and a \\ backslash.');
+    assert.equal(readJson(repo, "package.json").description, plugin.description);
     assert.deepEqual(plugin.author, { name: "Acme Dev", url: "https://github.com/acme-dev" });
   });
 });
@@ -139,8 +141,8 @@ describe("publish_to_npm", () => {
 });
 
 describe("invalid answers", () => {
-  for (const github_owner of ['bad"owner', "acme--tools", "-acme", "acme-"]) {
-    test(`github_owner ${JSON.stringify(github_owner)} is rejected`, () => {
+  for (const github_owner of ['bad"owner', "acme--tools", "-acme", "acme-", "a".repeat(40)]) {
+    test(`github_owner ${JSON.stringify(github_owner).slice(0, 20)} is rejected`, () => {
       assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", github_owner }));
     });
   }
