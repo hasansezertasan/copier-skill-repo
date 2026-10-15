@@ -1,26 +1,45 @@
 // The single test seam: render the template, then judge the rendered repo only
-// through its own check and its files. Nothing here inspects template internals.
+// through its own check and its files. The one exception is the guard that the
+// template itself ships no generated output.
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const templateRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workDirs = [];
+const FIVE_MINUTES = 5 * 60 * 1000;
 
+function scratchDir() {
+  const dir = mkdtempSync(join(tmpdir(), "copier-skills-"));
+  workDirs.push(dir);
+  return dir;
+}
+
+// Render from a plain copy of the working tree so the result never depends on
+// git tags, HEAD or uncommitted changes in this checkout.
 function render(data) {
-  const dest = mkdtempSync(join(tmpdir(), "copier-skills-"));
-  workDirs.push(dest);
+  const source = scratchDir();
+  cpSync(join(templateRoot, "copier.yml"), join(source, "copier.yml"));
+  cpSync(join(templateRoot, "template"), join(source, "template"), { recursive: true });
+  const dest = scratchDir();
   const dataArgs = Object.entries(data).flatMap(([k, v]) => ["--data", `${k}=${v}`]);
-  execFileSync(
-    "copier",
-    ["copy", "--defaults", "--trust", "--quiet", ...dataArgs, templateRoot, dest],
-    { stdio: "inherit" },
-  );
+  execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", ...dataArgs, source, dest], {
+    stdio: "inherit",
+    timeout: FIVE_MINUTES,
+  });
   return dest;
+}
+
+// What CI will run in a fresh checkout: a clean install from the committed
+// lockfile, then the repo's own check.
+function installAndCheck(repo) {
+  const options = { cwd: repo, stdio: "inherit", timeout: FIVE_MINUTES };
+  execFileSync("npm", ["ci"], options);
+  execFileSync("npm", ["run", "check"], options);
 }
 
 const readJson = (dir, path) => JSON.parse(readFileSync(join(dir, path), "utf8"));
@@ -34,7 +53,7 @@ describe("rendered with default answers", () => {
   });
 
   test("passes its own check with no generated-output drift", () => {
-    execFileSync("npm", ["run", "check"], { cwd: repo, stdio: "inherit" });
+    installAndCheck(repo);
   });
 
   test("ships the placeholder skill under its default name", () => {
@@ -97,7 +116,7 @@ describe("rendered with non-default answers", () => {
   test("names the placeholder skill from the answer and still passes check", () => {
     assert.ok(existsSync(join(repo, "skills/widget-check/SKILL.md")));
     assert.ok(!existsSync(join(repo, "skills/hello")));
-    execFileSync("npm", ["run", "check"], { cwd: repo, stdio: "inherit" });
+    installAndCheck(repo);
   });
 
   test("threads owner and author answers into the manifests", () => {
@@ -107,11 +126,18 @@ describe("rendered with non-default answers", () => {
   });
 });
 
+describe("invalid answers", () => {
+  test("a github_owner that could break quoted manifest values is rejected", () => {
+    assert.throws(() =>
+      render({ repo_name: "demo-skills", description: "Demo.", github_owner: 'bad"owner' }),
+    );
+  });
+});
+
 test("the template stores no generated output", () => {
-  const entries = readdirSync(join(templateRoot, "template"), { withFileTypes: true }).map(
-    (entry) => entry.name,
+  const generated = new Set(["skills", ".claude-plugin", ".codex-plugin", ".agents", "AGENTS.md"]);
+  const found = readdirSync(join(templateRoot, "template"), { recursive: true }).filter((path) =>
+    generated.has(path.split("/")[0]),
   );
-  for (const generated of ["skills", ".claude-plugin", ".codex-plugin", ".agents"]) {
-    assert.ok(!entries.includes(generated), `template ships generated ${generated}`);
-  }
+  assert.deepEqual(found, []);
 });

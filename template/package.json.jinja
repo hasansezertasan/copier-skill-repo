@@ -11,7 +11,7 @@
     "type": "git",
     "url": "{{ repo_url }}"
   },
-  "keywords": {{ keywords.split(',') | map('trim') | reject('equalto', '') | list | tojson }},
+  "keywords": {{ keywords_json | tojson }},
   "scripts": {
     "generate": "ai-rulez generate --no-self-mcp --strict-config && ai-rulez generate --plugin",
     "check": "ai-rulez generate --check --no-self-mcp --strict-config && ai-rulez verify --plugin && ai-rulez validate --strict"
