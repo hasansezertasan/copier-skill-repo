@@ -12,8 +12,8 @@ repo_name:
   type: str
   help: Repository and plugin name, lowercase and hyphenated (for example scoop-bucket-skills)
   validator: >-
-    {% if not repo_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
-    Use lowercase letters, digits and single hyphens, starting with a letter.
+    {% if repo_name | length > 64 or not repo_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Use up to 64 lowercase letters, digits and single hyphens, starting with a letter.
     {% endif %}
 
 description:
@@ -57,8 +57,8 @@ placeholder_skill:
   default: hello
   help: Name of the placeholder skill, replaced later by the repo's real skills
   validator: >-
-    {% if not placeholder_skill | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
-    Use lowercase letters, digits and single hyphens, starting with a letter.
+    {% if placeholder_skill | length > 64 or not placeholder_skill | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Use up to 64 lowercase letters, digits and single hyphens, starting with a letter.
     {% endif %}
 
 publish_to_npm:

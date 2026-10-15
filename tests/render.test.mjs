@@ -141,6 +141,18 @@ describe("publish_to_npm", () => {
 });
 
 describe("invalid answers", () => {
+  const name64 = "a".repeat(64);
+  for (const [question, value] of [
+    ["repo_name", `${name64}b`],
+    ["repo_name", "Demo_Skills"],
+    ["placeholder_skill", `${name64}b`],
+    ["placeholder_skill", "Hello World"],
+  ]) {
+    test(`${question} ${JSON.stringify(value).slice(0, 20)} is rejected`, () => {
+      assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", [question]: value }));
+    });
+  }
+
   for (const github_owner of ['bad"owner', "acme--tools", "-acme", "acme-", "a".repeat(40)]) {
     test(`github_owner ${JSON.stringify(github_owner).slice(0, 20)} is rejected`, () => {
       assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", github_owner }));
