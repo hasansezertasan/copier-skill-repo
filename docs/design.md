@@ -1,0 +1,44 @@
+# copier-skills design
+
+Decisions from the design grilling session (2026-10-15). Terms are defined in `CONTEXT.md`; the generator choice is in `docs/adr/0001-ai-rulez-as-the-generator.md`. Surveyed repos: scoop-bucket-skills, ghost-library-skills, infra-copilot (skill repos) and homebrew-news (not one).
+
+## Scope
+
+- The template owns the scaffold only. It never owns skill content.
+- It ships one placeholder skill: a minimal `SKILL.md` named from the `placeholder_skill` answer.
+- Out of scope: Hermes packaging and repos like homebrew-news.
+- Runtimes: Claude Code, Codex, OpenCode and Pi are always on.
+- OpenCode install is git-only (copy or symlink `skills/` into `.agents/skills/`). Official docs show no way for an npm package to ship skills to OpenCode, so `docs/installation.md` records this as an open question.
+
+## Tooling
+
+- Source of truth is `.ai-rulez/`; ai-rulez v5 is pinned in `devDependencies`.
+- Generated output is committed and checked for drift in CI. A Copier `_tasks` entry runs `npm install && npm run generate` after rendering; nothing generated is stored in the template.
+- Task runner is `package.json` scripts only (`npm run check`, `npm run generate`). Node comes from `.node-version`. No mise, no Makefile.
+- The version source is `package.json`, the one file release-please bumps. Pi installs from npm and needs the `pi-package` keyword and a `pi.skills` entry.
+- Helper scripts (release guard, repository check) are dependency-free `.mjs` files.
+- All ai-rulez lint rules are on by default. A repo opts out per rule with a stated reason (scoop turns off `AR401` and `AR402` because its skills cite files of the bucket they operate on).
+
+## CI and release
+
+- CI takes scoop's hardening level: every action pinned by SHA, `permissions: {}` with per-job scopes, `check.yml` unfiltered and reusable from `release.yml`.
+- Release uses release-please on conventional commits.
+- `publish_to_npm` (default yes) controls publishing with trusted publishing and provenance. When off, the publish job is dropped and `package.json` is `"private": true`; Pi users then install from git.
+- Renovate extends `local>hasansezertasan/renovate-config`. Template updates arrive as `copier update` PRs through `.copier-answers.yml`, as in copier-pyproject.
+- copier-skills versions itself with release-please and git tags, which `copier update` resolves against.
+
+## Questions the template asks
+
+`repo_name`, `description`, `keywords`, `author_name` and `author_url` (default to Hasan Sezer Tasan), `github_owner` (default `hasansezertasan`), `license`, `placeholder_skill`, `publish_to_npm`. Derived: repository URL, marketplace name, display name.
+
+## Docs and ownership
+
+- Template-owned and three-way merged: `CONTRIBUTING.md` (includes the manual one-time setup checklist and a note on `references/` and `evals/` layouts) and `docs/installation.md` (per-runtime install steps).
+- Repo-owned (never overwritten): `.ai-rulez/skills/**`, `README.md`, `CHANGELOG.md`, the release-please manifest, and `version` in `package.json`.
+- Not owned: maintainers docs and per-repo ADRs.
+
+## Rollout
+
+- Template CI renders with defaults and runs `npm ci && npm run check`. Diffing against real repos belongs to each adoption PR.
+- Adoption order: scoop-bucket-skills, then ghost-library-skills, then infra-copilot (ai-rulez v4, shell checks, no `package.json`).
+- v1 ships no `setup` or `adopt` skills. After two repos are adopted, decide whether to add ones modeled on copier-pyproject's.
