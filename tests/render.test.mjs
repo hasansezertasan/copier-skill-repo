@@ -126,12 +126,24 @@ describe("rendered with non-default answers", () => {
   });
 });
 
-describe("invalid answers", () => {
-  test("a github_owner that could break quoted manifest values is rejected", () => {
-    assert.throws(() =>
-      render({ repo_name: "demo-skills", description: "Demo.", github_owner: 'bad"owner' }),
-    );
+describe("publish_to_npm", () => {
+  test("is publishable by default", () => {
+    const repo = render({ repo_name: "demo-skills", description: "Demo." });
+    assert.equal(readJson(repo, "package.json").private, undefined);
   });
+
+  test("marks the package private when turned off", () => {
+    const repo = render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: "false" });
+    assert.equal(readJson(repo, "package.json").private, true);
+  });
+});
+
+describe("invalid answers", () => {
+  for (const github_owner of ['bad"owner', "acme--tools", "-acme", "acme-"]) {
+    test(`github_owner ${JSON.stringify(github_owner)} is rejected`, () => {
+      assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", github_owner }));
+    });
+  }
 });
 
 test("the template stores no generated output", () => {
