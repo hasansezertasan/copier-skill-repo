@@ -145,6 +145,14 @@ describe("publish_to_npm", () => {
 });
 
 describe("invalid answers", () => {
+  for (const question of ["description", "author_name", "author_url"]) {
+    for (const [label, value] of [["empty", ""], ["whitespace-only", "   "]]) {
+      test(`${question} that is ${label} is rejected`, () => {
+        assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", [question]: value }));
+      });
+    }
+  }
+
   for (const question of ["description", "author_name", "author_url", "keywords"]) {
     for (const [label, value] of [["escape", "bad\u001bvalue"], ["backspace", "bad\bvalue"], ["newline", "bad\nvalue"]]) {
       test(`${question} containing ${label} is rejected`, () => {

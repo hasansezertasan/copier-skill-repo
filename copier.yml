@@ -20,8 +20,8 @@ description:
   type: str
   help: One sentence on what the skills in this repo do
   validator: >-
-    {% if description | regex_search('[\x00-\x1f\x7f]') %}
-    Use a single line without control characters.
+    {% if not description | trim or description | regex_search('[\x00-\x1f\x7f]') %}
+    Use a non-empty single line without control characters.
     {% endif %}
 
 keywords:
@@ -38,8 +38,8 @@ author_name:
   default: Hasan Sezer Tasan
   help: Author name
   validator: >-
-    {% if author_name | regex_search('[\x00-\x1f\x7f]') %}
-    Use a single line without control characters.
+    {% if not author_name | trim or author_name | regex_search('[\x00-\x1f\x7f]') %}
+    Use a non-empty single line without control characters.
     {% endif %}
 
 author_url:
@@ -47,8 +47,8 @@ author_url:
   default: https://github.com/hasansezertasan
   help: Author URL
   validator: >-
-    {% if author_url | regex_search('[\x00-\x1f\x7f]') %}
-    Use a single line without control characters.
+    {% if not author_url | trim or author_url | regex_search('[\x00-\x1f\x7f]') %}
+    Use a non-empty single line without control characters.
     {% endif %}
 
 github_owner:
