@@ -1,0 +1,74 @@
+_min_copier_version: "9.4.0"
+_subdirectory: template
+_answers_file: .copier-answers.yml
+
+# Generated output (skills/, plugin manifests, marketplace catalogs) is never
+# stored in the template: it is built here, right after rendering.
+_tasks:
+  - command: npm install
+  - command: npm run generate
+
+repo_name:
+  type: str
+  help: Repository and plugin name, lowercase and hyphenated (for example scoop-bucket-skills)
+  validator: >-
+    {% if not repo_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Use lowercase letters, digits and single hyphens, starting with a letter.
+    {% endif %}
+
+description:
+  type: str
+  help: One sentence on what the skills in this repo do
+
+keywords:
+  type: str
+  default: skills
+  help: Comma-separated package keywords
+
+author_name:
+  type: str
+  default: Hasan Sezer Tasan
+  help: Author name
+
+author_url:
+  type: str
+  default: https://github.com/hasansezertasan
+  help: Author URL
+
+github_owner:
+  type: str
+  default: hasansezertasan
+  help: GitHub user or organization that owns the repository
+
+license:
+  type: str
+  default: MIT
+  choices:
+    - MIT
+    - Apache-2.0
+  help: SPDX license identifier
+
+placeholder_skill:
+  type: str
+  default: hello
+  help: Name of the placeholder skill, replaced later by the repo's real skills
+  validator: >-
+    {% if not placeholder_skill | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Use lowercase letters, digits and single hyphens, starting with a letter.
+    {% endif %}
+
+publish_to_npm:
+  type: bool
+  default: true
+  help: Publish the package to npm on release
+
+# Derived from the answers above; never asked.
+repo_url:
+  type: str
+  when: false
+  default: "https://github.com/{{ github_owner }}/{{ repo_name }}"
+
+display_name:
+  type: str
+  when: false
+  default: "{{ repo_name.replace('-', ' ') | title }}"
