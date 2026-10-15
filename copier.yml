@@ -1,0 +1,101 @@
+_min_copier_version: "9.4.0"
+_subdirectory: template
+_answers_file: .copier-answers.yml
+
+# Generated output (skills/, plugin manifests, marketplace catalogs) is never
+# stored in the template: it is built here, right after rendering.
+_tasks:
+  - command: npm install
+  - command: npm run generate
+
+repo_name:
+  type: str
+  default: "{{ _copier_conf.dst_path.name }}"
+  help: Repository and plugin name, lowercase and hyphenated (for example scoop-bucket-skills)
+  validator: >-
+    {% if repo_name | length > 64 or not repo_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Use up to 64 lowercase letters, digits and single hyphens, starting with a letter.
+    {% endif %}
+
+description:
+  type: str
+  default: "Agent skills for the {{ repo_name }} plugin."
+  help: One sentence on what the skills in this repo do
+  validator: >-
+    {% if not description | trim or description | regex_search('[\x00-\x1f\x7f]') %}
+    Use a non-empty single line without control characters.
+    {% endif %}
+
+keywords:
+  type: str
+  default: skills
+  help: Comma-separated package keywords
+  validator: >-
+    {% if keywords | regex_search('[\x00-\x1f\x7f]') %}
+    Use a single line without control characters.
+    {% endif %}
+
+author_name:
+  type: str
+  default: Hasan Sezer Tasan
+  help: Author name
+  validator: >-
+    {% if not author_name | trim or author_name | regex_search('[\x00-\x1f\x7f]') %}
+    Use a non-empty single line without control characters.
+    {% endif %}
+
+author_url:
+  type: str
+  default: https://github.com/hasansezertasan
+  help: Author URL
+  validator: >-
+    {% if not author_url | trim or author_url | regex_search('[\x00-\x1f\x7f]') %}
+    Use a non-empty single line without control characters.
+    {% endif %}
+
+github_owner:
+  type: str
+  default: hasansezertasan
+  help: GitHub user or organization that owns the repository
+  validator: >-
+    {% if github_owner | length > 39 or not github_owner | regex_search('^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$') %}
+    Use up to 39 letters, digits and single hyphens, as GitHub names do.
+    {% endif %}
+
+license:
+  type: str
+  default: MIT
+  choices:
+    - MIT
+    - Apache-2.0
+  help: SPDX license identifier
+
+placeholder_skill:
+  type: str
+  default: hello
+  help: Name of the placeholder skill, replaced later by the repo's real skills
+  validator: >-
+    {% if placeholder_skill | length > 64 or not placeholder_skill | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$') %}
+    Use up to 64 lowercase letters, digits and single hyphens, starting with a letter.
+    {% endif %}
+
+publish_to_npm:
+  type: bool
+  default: true
+  help: Publish the package to npm on release
+
+# Derived from the answers above; never asked.
+repo_url:
+  type: str
+  when: false
+  default: "https://github.com/{{ github_owner }}/{{ repo_name }}"
+
+keywords_json:
+  type: json
+  when: false
+  default: "{{ keywords.split(',') | map('trim') | reject('equalto', '') | list | tojson }}"
+
+display_name:
+  type: str
+  when: false
+  default: "{{ repo_name.replace('-', ' ') | title }}"
