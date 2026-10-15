@@ -13,7 +13,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 ## Tooling
 
 - Source of truth is `.ai-rulez/`; ai-rulez v5 is pinned in `devDependencies`.
-- Generated output is committed and checked for drift in CI. A Copier `_task` runs `npm install && npm run generate` after rendering; nothing generated is stored in the template.
+- Generated output is committed and checked for drift in CI. A Copier `_tasks` entry runs `npm install && npm run generate` after rendering; nothing generated is stored in the template.
 - Task runner is `package.json` scripts only (`npm run check`, `npm run generate`). Node comes from `.node-version`. No mise, no Makefile.
 - The version source is `package.json`, the one file release-please bumps. Pi installs from npm and needs the `pi-package` keyword and a `pi.skills` entry.
 - Helper scripts (release guard, repository check) are dependency-free `.mjs` files.
