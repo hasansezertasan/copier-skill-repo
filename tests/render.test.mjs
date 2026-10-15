@@ -120,6 +120,9 @@ describe("hardened CI", () => {
   let repo;
   const workflow = () => readFileSync(join(repo, ".github/workflows/check.yml"), "utf8");
   const runCheck = () => execFileSync("npm", ["run", "check"], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES });
+  const runRepoCheck = () =>
+    execFileSync("node", ["scripts/check-repo.mjs"], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES });
+  const stderrMatches = (pattern) => (error) => pattern.test(String(error.stderr) + String(error.stdout));
   before(() => {
     repo = render({ repo_name: "demo-skills", description: "Demo." });
     execFileSync("npm", ["ci"], { cwd: repo, stdio: "inherit", timeout: FIVE_MINUTES });
@@ -154,7 +157,7 @@ describe("hardened CI", () => {
     const original = readFileSync(file, "utf8");
     writeFileSync(file, `${original}\nhand edit\n`);
     try {
-      assert.throws(runCheck);
+      assert.throws(runCheck, stderrMatches(/drift|out of date|stale|differ|generate/i));
     } finally {
       writeFileSync(file, original);
     }
@@ -166,11 +169,11 @@ describe("hardened CI", () => {
     const original = workflow();
     writeFileSync(file, original.replace(/@[0-9a-f]{40}/, "@v4"));
     try {
-      assert.throws(runCheck);
+      assert.throws(runRepoCheck, stderrMatches(/not pinned by commit SHA/));
     } finally {
       writeFileSync(file, original);
     }
-    runCheck();
+    runRepoCheck();
   });
 
   test("the repository check rejects missing top-level permissions", () => {
@@ -178,16 +181,16 @@ describe("hardened CI", () => {
     const original = workflow();
     writeFileSync(file, original.replace(/^permissions: \{\}\n/m, ""));
     try {
-      assert.throws(runCheck);
+      assert.throws(runRepoCheck, stderrMatches(/top-level `permissions: \{\}` is required/));
     } finally {
       writeFileSync(file, original);
     }
-    runCheck();
+    runRepoCheck();
   });
 
   test("the repository check has no dependencies", () => {
     const script = readFileSync(join(repo, "scripts/check-repo.mjs"), "utf8");
-    for (const [, specifier] of script.matchAll(/(?:from|import\()\s*["']([^"']+)["']/g)) {
+    for (const [, specifier] of script.matchAll(/(?:\bfrom|\bimport\s*\(?|\brequire\()\s*["']([^"']+)["']/g)) {
       assert.match(specifier, /^node:/, specifier);
     }
   });
