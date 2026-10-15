@@ -21,11 +21,12 @@ function scratchDir() {
 
 // Render from a plain copy of the working tree so the result never depends on
 // git tags, HEAD or uncommitted changes in this checkout.
-function render(data) {
+function render(data, destName) {
   const source = scratchDir();
   cpSync(join(templateRoot, "copier.yml"), join(source, "copier.yml"));
   cpSync(join(templateRoot, "template"), join(source, "template"), { recursive: true });
-  const dest = scratchDir();
+  // The destination folder name is the default repo_name, so a test can pick it.
+  const dest = destName ? join(scratchDir(), destName) : scratchDir();
   // A data file (JSON is valid YAML) delivers answers exactly as written, so
   // control characters reach the template's validators instead of failing in
   // the command-line parser first.
@@ -101,6 +102,15 @@ describe("rendered with default answers", () => {
       "publish_to_npm",
       "repo_name",
     ]);
+  });
+});
+
+describe("rendered with no answers at all", () => {
+  test("takes repo_name from the destination folder and passes its own check", () => {
+    const repo = render({}, "bare-skills");
+    assert.equal(readJson(repo, ".claude-plugin/plugin.json").name, "bare-skills");
+    assert.ok(readJson(repo, "package.json").description.length > 0);
+    installAndCheck(repo);
   });
 });
 
