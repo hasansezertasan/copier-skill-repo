@@ -4,7 +4,7 @@
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,8 +26,12 @@ function render(data) {
   cpSync(join(templateRoot, "copier.yml"), join(source, "copier.yml"));
   cpSync(join(templateRoot, "template"), join(source, "template"), { recursive: true });
   const dest = scratchDir();
-  const dataArgs = Object.entries(data).flatMap(([k, v]) => ["--data", `${k}=${v}`]);
-  execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", ...dataArgs, source, dest], {
+  // A data file (JSON is valid YAML) delivers answers exactly as written, so
+  // control characters reach the template's validators instead of failing in
+  // the command-line parser first.
+  const dataFile = join(scratchDir(), "answers.json");
+  writeFileSync(dataFile, JSON.stringify(data));
+  execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", "--data-file", dataFile, source, dest], {
     stdio: "inherit",
     timeout: FIVE_MINUTES,
   });
@@ -135,12 +139,20 @@ describe("publish_to_npm", () => {
   });
 
   test("marks the package private when turned off", () => {
-    const repo = render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: "false" });
+    const repo = render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false });
     assert.equal(readJson(repo, "package.json").private, true);
   });
 });
 
 describe("invalid answers", () => {
+  for (const question of ["description", "author_name", "author_url", "keywords"]) {
+    for (const [label, value] of [["escape", "bad\u001bvalue"], ["backspace", "bad\bvalue"], ["newline", "bad\nvalue"]]) {
+      test(`${question} containing ${label} is rejected`, () => {
+        assert.throws(() => render({ repo_name: "demo-skills", description: "Demo.", [question]: value }));
+      });
+    }
+  }
+
   const name64 = "a".repeat(64);
   for (const [question, value] of [
     ["repo_name", `${name64}b`],
