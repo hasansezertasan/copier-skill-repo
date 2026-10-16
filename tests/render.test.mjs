@@ -794,6 +794,10 @@ describe("four runtimes", () => {
         assert.match(doc, new RegExp(`^\\| ${runtime} \\|`, "m"), `${runtime} row`);
       }
       assert.doesNotMatch(doc, /scoop/i, "no text borrowed from another repo");
+      // A bare `pi update` updates Pi itself; a package needs its source.
+      assert.match(doc, /`pi update npm:demo-skills`/);
+      assert.match(doc, /`pi update git:github\.com\/acme\/demo-skills`/);
+      assert.doesNotMatch(doc, /`pi update`, then/);
       assert.match(doc, /Open question/);
       assert.ok(!doc.includes("{{") && !doc.includes("{%"), "no unrendered template syntax");
     });
@@ -813,6 +817,8 @@ describe("four runtimes", () => {
   test("offers Pi from git only when not publishing to npm", () => {
     const doc = read(render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false }), "docs/installation.md");
     assert.doesNotMatch(doc, /pi install npm:/);
+    assert.doesNotMatch(doc, /pi update npm:/);
+    assert.match(doc, /`pi update git:/);
     assert.match(doc, /pi install git:/);
   });
 });
