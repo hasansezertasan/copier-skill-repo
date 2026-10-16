@@ -384,6 +384,10 @@ describe("release", () => {
       assert.ok(!existsSync(join(repo, "CHANGELOG.md")), "release-please creates the changelog itself");
       const config = readJson(repo, "release-please-config.json").packages["."];
       assert.equal(config["release-type"], "node");
+      // Without a release tag release-please starts at 1.0.0 whatever the seeded
+      // manifest says; `initial-version` is what makes the first release 0.1.0.
+      assert.equal(config["initial-version"], "0.1.0");
+      assert.equal(readJson(repo, "release-please-config.json")["bump-minor-pre-major"], true);
       // The default grouped title omits the version, so release-please cannot
       // recognise the merged release PR and silently creates no tag
       // (googleapis/release-please#2712).
