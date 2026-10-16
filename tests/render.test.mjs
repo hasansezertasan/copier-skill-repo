@@ -796,7 +796,10 @@ describe("four runtimes", () => {
       assert.doesNotMatch(doc, /scoop/i, "no text borrowed from another repo");
       // Caveats that must survive: copied skills are verified, not just the
       // clone, and the Codex update route is flagged as unverified.
-      assert.match(doc, /`diff -r <clone>\/skills <destination>` prints nothing/);
+      // Per skill: a plain `diff -r` of the two directories would also report
+      // destination-only skills that came from other sources.
+      assert.match(doc, /for d in <clone>\/skills\/\*\/; do diff -r "\$d" "<destination>\/\$\(basename "\$d"\)"; done` prints nothing/);
+      assert.doesNotMatch(doc, /`diff -r <clone>\/skills <destination>`/);
       assert.match(doc, /`marketplace upgrade` applies to Git marketplaces, not a local path; this update route has not been verified/);
       // A bare `pi update` updates Pi itself; a package needs its source.
       assert.match(doc, /`pi update npm:demo-skills`/);
