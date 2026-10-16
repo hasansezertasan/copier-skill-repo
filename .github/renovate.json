@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>hasansezertasan/renovate-config"],
+  "packageRules": [
+    {
+      "description": "Freeze the shipped template pins under template/**. They are seed values: each generated repo ships its own Renovate config and owns those bumps. Managing them here too makes `copier update` conflict, because the 3-way merge sees the template render and the downstream file both moving the same literal to different values. This repo's own workflows and requirements.txt (root paths) stay Renovate-managed.",
+      "matchFileNames": ["template/**"],
+      "enabled": false
+    }
+  ]
+}
