@@ -257,6 +257,20 @@ describe("hardened CI", () => {
     checkMutation(withJobPermissions('    permissions: { contents: "read", id-token: \'write\' }'), null);
   });
 
+  test("the repository check fails closed on a flow-mapping step it cannot read", () => {
+    checkMutation(
+      (text) => text.replace(checkoutRef, "uses: actions/checkout@v4").replace("- uses: actions/checkout@v4", "- { with: { persist-credentials: false }, uses: actions/checkout@v4 }"),
+      /unsupported flow-mapping step/,
+    );
+  });
+
+  test("the repository check fails closed when job ids are not indented two spaces", () => {
+    checkMutation(
+      (text) => text.replace(/^jobs:\n/m, "jobs:\n    extra:\n        runs-on: ubuntu-latest\n        steps: []\n"),
+      /jobs are not indented two spaces/,
+    );
+  });
+
   test("the repository check ignores a commented-out action reference", () => {
     checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });

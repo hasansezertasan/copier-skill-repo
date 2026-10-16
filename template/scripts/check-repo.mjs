@@ -3,7 +3,8 @@
 // violation. Line-based on purpose (no YAML parser), so it expects the usual
 // block-style layout: top-level keys at column 0, job ids at two spaces
 // (plain or quoted), block scalars (`run: |`) skipped, `uses:` value on the
-// same or the next line.
+// same or the next line. Layouts outside that subset (other job indentation,
+// flow-mapping steps with nested braces) fail the check instead of passing it.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -53,7 +54,8 @@ const USES = /(?:^\s*(?:-\s+)*|^\s*-\s*\{(?:[^{}]*,)?\s*)["']?uses["']?\s*:\s*["
 for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
   const lines = readYaml(path);
   lines.forEach((line, index) => {
-    for (const [, inline] of line.matchAll(USES)) {
+    const refs = [...line.matchAll(USES)];
+    for (const [, inline] of refs) {
       let ref = inline;
       let at = index;
       if (ref === "") {
@@ -66,6 +68,10 @@ for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
       if (!/@[0-9a-f]{40}$/.test(ref) && !/^docker:\/\/.+@sha256:[0-9a-f]{64}$/.test(ref)) {
         problems.push(`${path}:${at + 1}: \`${ref}\` is not pinned by commit SHA`);
       }
+    }
+    // Fail closed: a flow-mapping step the pattern cannot read is not "no action".
+    if (refs.length === 0 && /^\s*-\s*\{/.test(line) && /\buses\b/.test(line)) {
+      problems.push(`${path}:${index + 1}: unsupported flow-mapping step; write the step in block style`);
     }
   });
 }
@@ -83,6 +89,9 @@ for (const path of workflows) {
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((line) => /^\S/.test(line));
   const jobsBlock = start < 0 ? [] : end < 0 ? rest : rest.slice(0, end);
+  // Job ids are matched at two spaces; any other width would skip every job.
+  const firstJob = jobsBlock.find((line) => line.trim() !== "");
+  if (firstJob && !/^ {2}\S/.test(firstJob)) problems.push(`${path}: jobs are not indented two spaces`);
   const jobIds = jobsBlock.flatMap((line, i) => (/^ {2}["']?[\w-]+["']?\s*:$/.test(line) ? [i] : []));
   jobIds.forEach((from, n) => {
     const body = jobsBlock.slice(from + 1, jobIds[n + 1] ?? jobsBlock.length);
