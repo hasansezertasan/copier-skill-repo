@@ -281,6 +281,46 @@ describe("hardened CI", () => {
     checkMutation((text) => text.replace(checkoutRef, "uses: ./.github/actions/setup"), null);
   });
 
+  test("the repository check reads a step whose dash is on its own line", () => {
+    checkMutation(
+      (text) => text.replace(/- uses: actions\/checkout@[0-9a-f]{40}/, "-\n        uses: actions/checkout@v4"),
+      /not pinned by commit SHA/,
+    );
+  });
+
+  const reusableJob = (ref) => (text) =>
+    text.replace(/^jobs:\n/m, `jobs:\n  extra:\n    permissions: {}\n    uses: ${ref}\n`);
+
+  test("the repository check rejects an unpinned reusable workflow reference on a job", () => {
+    checkMutation(reusableJob("owner/repo/.github/workflows/build.yml@v1"), /not pinned by commit SHA/);
+  });
+
+  test("the repository check accepts a pinned or local reusable workflow reference on a job", () => {
+    checkMutation(reusableJob(`owner/repo/.github/workflows/build.yml@${"a".repeat(40)}`), null);
+    checkMutation(reusableJob("./.github/workflows/build.yml"), null);
+  });
+
+  test("the repository check rejects anchors, aliases and merge keys", () => {
+    for (const transform of [
+      (text) => text.replace(/^jobs:\n/m, "jobs:\n  extra: &anchor\n    runs-on: ubuntu-latest\n    steps: []\n"),
+      (text) => text.replace("- run: npm ci\n", "- run: npm ci\n        env: *shared\n"),
+      (text) => text.replace("    runs-on: ubuntu-latest\n", "    runs-on: ubuntu-latest\n    <<: *defaults\n"),
+    ]) {
+      checkMutation(transform, /anchors and aliases are not supported/);
+    }
+  });
+
+  test("the repository check ignores a uses key in a matrix entry", () => {
+    checkMutation(
+      (text) =>
+        text.replace(
+          "    steps:\n",
+          "    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n            uses: ordinary\n    steps:\n",
+        ),
+      null,
+    );
+  });
+
   test("the repository check ignores a commented-out action reference", () => {
     checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });

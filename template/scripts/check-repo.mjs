@@ -2,9 +2,10 @@
 // Run by `npm run check` from the repo root; exits non-zero and lists every
 // violation. Line-based on purpose (no YAML parser), so it reads only block-style
 // YAML: top-level keys at column 0, job ids at two spaces (plain or quoted),
-// `uses:` as a key of a step, block scalars (`run: |`) skipped. Anything outside
-// that subset fails the check instead of passing it: flow collections other than
-// `{}` and `[]`, and other job indentation. Local actions outside
+// `uses:` as a key of a step under `steps:` or of a job, block scalars (`run: |`)
+// skipped. Anything outside that subset fails the check instead of passing it:
+// flow collections other than `{}` and `[]`, anchors and aliases, and other job
+// indentation. Local actions outside
 // .github/actions are not followed.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -40,6 +41,9 @@ const readYaml = (path) => {
     if (/(?:^\s*-\s*|:\s+)(?:\{(?!\s*\})|\[(?!\s*\]))/.test(bare)) {
       problems.push(`${path}:${index + 1}: flow style is not supported; use block style`);
     }
+    if (/(?:^\s*(?:-\s+)?|:\s+|-\s+)[&*][\w-]|^\s*<<\s*:/.test(bare)) {
+      problems.push(`${path}:${index + 1}: anchors and aliases are not supported; repeat the value`);
+    }
     return line;
   });
 };
@@ -51,32 +55,45 @@ const scopedPermissions = (value, children) =>
   value === "{}" || (value === "" && children.length > 0 && children.every((line) => SCOPE.test(line)));
 
 // Workflows and local composite actions both reference third-party actions.
-// `uses` only counts as a key of a step (a list item), never as a nested key.
+// A step's `uses:` is the key of a list item under `steps:`; a job's is a key of
+// the job. Any other `uses` key (matrix values, env, inputs) is not a reference.
 const USES = /^["']?uses["']?\s*:\s*["']?([^\s"',}]*)/;
+const checkUses = (path, lines, index, value) => {
+  let ref = value;
+  let at = index;
+  if (ref === "") {
+    // The value may sit on the following line.
+    at = lines.findIndex((next, i) => i > index && next.trim() !== "");
+    ref = at < 0 ? "" : lines[at].trim().replace(/^["']|["']$/g, "");
+  }
+  // Local actions have no SHA to pin.
+  if (ref.startsWith("./")) return;
+  if (!/@[0-9a-f]{40}$/.test(ref) && !/^docker:\/\/.+@sha256:[0-9a-f]{64}$/.test(ref)) {
+    problems.push(`${path}:${at + 1}: \`${ref}\` is not pinned by commit SHA`);
+  }
+};
+
 for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
   const lines = readYaml(path);
-  const items = [];
+  const parents = []; // block keys that open a list or mapping
+  const steps = []; // open step items: the dash column and the column of their keys
   lines.forEach((line, index) => {
     if (line.trim() === "") return;
     const indent = line.length - line.trimStart().length;
-    while (items.length > 0 && items.at(-1).dash >= indent) items.pop();
-    const dash = /^\s*-\s+/.exec(line);
-    const isStepKey = dash !== null || (items.length > 0 && items.at(-1).key === indent);
-    if (dash) items.push({ dash: indent, key: dash[0].length });
+    const dash = /^\s*-(?:\s+|$)/.exec(line);
+    while (parents.length > 0 && parents.at(-1).indent >= indent + (dash ? 1 : 0)) parents.pop();
+    while (steps.length > 0 && steps.at(-1).dash >= indent) steps.pop();
+    const opens = /^\s*([\w-]+)\s*:$/.exec(line);
+    if (opens && !dash) parents.push({ indent, name: opens[1] });
+    if (dash && parents.at(-1)?.name === "steps") {
+      // A dash alone on its line puts the step's keys on the next line.
+      const keyAt = dash[0].length > line.trim().length ? lines.findIndex((next, i) => i > index && next.trim() !== "") : -1;
+      const key = keyAt < 0 ? dash[0].length : lines[keyAt].length - lines[keyAt].trimStart().length;
+      steps.push({ dash: indent, key });
+    }
+    const isStepKey = dash ? parents.at(-1)?.name === "steps" : steps.at(-1)?.key === indent;
     const match = isStepKey ? USES.exec(line.slice(dash ? dash[0].length : indent)) : null;
-    if (!match) return;
-    let ref = match[1];
-    let at = index;
-    if (ref === "") {
-      // The value may sit on the following line.
-      at = lines.findIndex((next, i) => i > index && next.trim() !== "");
-      ref = at < 0 ? "" : lines[at].trim().replace(/^["']|["']$/g, "");
-    }
-    // Local actions have no SHA to pin.
-    if (ref.startsWith("./")) return;
-    if (!/@[0-9a-f]{40}$/.test(ref) && !/^docker:\/\/.+@sha256:[0-9a-f]{64}$/.test(ref)) {
-      problems.push(`${path}:${at + 1}: \`${ref}\` is not pinned by commit SHA`);
-    }
+    if (match) checkUses(path, lines, index, match[1]);
   });
 }
 
@@ -101,6 +118,9 @@ for (const path of workflows) {
     const body = jobsBlock.slice(from + 1, jobIds[n + 1] ?? jobsBlock.length);
     // A job that calls a reusable workflow still scopes what it hands down.
     const job = jobsBlock[from].trim().replace(/\s*:$/, "").replace(/^["']|["']$/g, "");
+    // A job that calls a reusable workflow carries `uses:` at job level.
+    const jobUses = body.findIndex((line) => /^ {4}uses\s*:/.test(line));
+    if (jobUses >= 0) checkUses(path, lines, start + 2 + from + jobUses, USES.exec(body[jobUses].trim())[1]);
     const at = body.findIndex((line) => /^ {4}permissions\s*:/.test(line));
     if (at < 0) {
       problems.push(`${path}: job \`${job}\` has no permissions block`);
