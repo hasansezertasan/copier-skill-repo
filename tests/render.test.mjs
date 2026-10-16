@@ -321,6 +321,21 @@ describe("hardened CI", () => {
     );
   });
 
+  test("the repository check reads quoted steps and uses keys", () => {
+    checkMutation(
+      (text) => text.replace("    steps:\n", '    "steps":\n').replace(checkoutRef, 'uses: actions/checkout@v4'),
+      /not pinned by commit SHA/,
+    );
+    checkMutation((text) => text.replace(checkoutRef, '"uses": actions/checkout@v4'), /not pinned by commit SHA/);
+  });
+
+  test("the repository check reads a quoted job-level uses key", () => {
+    checkMutation(
+      (text) => text.replace(/^jobs:\n/m, 'jobs:\n  extra:\n    permissions: {}\n    "uses": owner/repo/.github/workflows/build.yml@v1\n'),
+      /not pinned by commit SHA/,
+    );
+  });
+
   test("the repository check ignores a commented-out action reference", () => {
     checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });

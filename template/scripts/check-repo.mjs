@@ -33,7 +33,8 @@ const readYaml = (path) => {
       if (raw.trim() === "" || indent > scalarIndent) return "";
       scalarIndent = -1;
     }
-    const line = stripComment(raw);
+    // A quoted key is the same key: `"steps":` reads as `steps:`.
+    const line = stripComment(raw).replace(/^(\s*(?:-\s+)?)(["'])([\w-]+)\2(\s*:)/, "$1$3$4");
     if (/:\s*[|>][+-]?\d*[+-]?$/.test(line)) scalarIndent = indent;
     // Fail closed on flow collections, which the line reader cannot follow.
     // Expressions and quoted text may hold brackets, so they are ignored here.
