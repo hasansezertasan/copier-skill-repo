@@ -2,6 +2,11 @@ _min_copier_version: "9.4.0"
 _subdirectory: template
 _answers_file: .copier-answers.yml
 
+# The manifest holds the released version and release-please owns it, so
+# adopting an existing repo must not reset it to the template's 0.0.0.
+_skip_if_exists:
+  - .release-please-manifest.json
+
 # Generated output (skills/, plugin manifests, marketplace catalogs) is never
 # stored in the template: it is built here, right after rendering.
 _tasks:

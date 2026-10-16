@@ -90,7 +90,7 @@ describe("rendered with default answers", () => {
 
   test("uses package.json as the version source", () => {
     const pkg = readJson(repo, "package.json");
-    assert.equal(pkg.version, "0.1.0");
+    assert.equal(pkg.version, "0.0.0");
     assert.equal(readJson(repo, ".claude-plugin/plugin.json").version, pkg.version);
     assert.match(pkg.devDependencies["ai-rulez"], /^5\.\d+\.\d+$/);
     assert.ok(pkg.scripts.check && pkg.scripts.generate);
@@ -362,6 +362,94 @@ describe("hardened CI", () => {
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
+    });
+  });
+});
+
+describe("release", () => {
+  const runIn = (repo, script, ...args) =>
+    execFileSync("node", [`scripts/${script}`, ...args], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES });
+  const guardFailsWith = (pattern) => (error) =>
+    error.status === 1 && !/\n\s+at .*:\d+:\d+/.test(String(error.stderr)) && pattern.test(String(error.stderr));
+  const releaseWorkflow = (repo) => readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
+
+  describe("publishing to npm (the default)", () => {
+    let repo;
+    before(() => {
+      repo = render({ repo_name: "demo-skills", description: "Demo." });
+    });
+
+    test("lets release-please own the version, changelog and manifest", () => {
+      assert.deepEqual(readJson(repo, ".release-please-manifest.json"), { ".": "0.0.0" });
+      assert.ok(!existsSync(join(repo, "CHANGELOG.md")), "release-please creates the changelog itself");
+      const config = readJson(repo, "release-please-config.json").packages["."];
+      assert.equal(config["release-type"], "node");
+      assert.deepEqual(config["extra-files"].map((file) => file.path).sort(), [
+        ".claude-plugin/marketplace.json",
+        ".claude-plugin/plugin.json",
+        ".codex-plugin/plugin.json",
+      ]);
+    });
+
+    test("has a publish job with trusted publishing and provenance", () => {
+      const workflow = releaseWorkflow(repo);
+      assert.match(workflow, /^  publish:$/m);
+      assert.match(workflow, /id-token: write/);
+      assert.match(workflow, /npm publish --provenance/);
+      assert.match(workflow, /release-guard\.mjs --publish/);
+      assert.match(workflow, /issues: write/);
+    });
+
+    test("keeps the release workflow within the hardened CI rules", () => {
+      runIn(repo, "check-repo.mjs");
+    });
+
+    test("passes its own release guard", () => {
+      runIn(repo, "release-guard.mjs", "--publish");
+    });
+
+    test("stops the release when a plugin manifest drifts from package.json", () => {
+      const path = join(repo, ".codex-plugin/plugin.json");
+      const original = readFileSync(path, "utf8");
+      writeFileSync(path, original.replace('"version": "0.0.0"', '"version": "9.9.9"'));
+      try {
+        assert.throws(() => runIn(repo, "release-guard.mjs", "--publish"), guardFailsWith(/\.codex-plugin\/plugin\.json: version "9\.9\.9"/));
+      } finally {
+        writeFileSync(path, original);
+      }
+    });
+
+    test("stops the release when a publishing repo is private", () => {
+      assert.throws(() => runIn(repo, "release-guard.mjs", "--private"), guardFailsWith(/must be "private": true/));
+    });
+
+    test("rejects a missing or unknown mode", () => {
+      assert.throws(() => runIn(repo, "release-guard.mjs"), guardFailsWith(/usage/));
+      assert.throws(() => runIn(repo, "release-guard.mjs", "--bogus"), guardFailsWith(/usage/));
+    });
+  });
+
+  describe("not publishing to npm", () => {
+    let repo;
+    before(() => {
+      repo = render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false });
+    });
+
+    test("has no publish job, no provenance and no id-token permission", () => {
+      const workflow = releaseWorkflow(repo);
+      assert.doesNotMatch(workflow, /^  publish:$/m);
+      assert.doesNotMatch(workflow, /provenance|id-token|npm publish/);
+      assert.match(workflow, /release-guard\.mjs --private/);
+    });
+
+    test("is private, keeps the release workflow hardened and passes its guard", () => {
+      assert.equal(readJson(repo, "package.json").private, true);
+      runIn(repo, "check-repo.mjs");
+      runIn(repo, "release-guard.mjs", "--private");
+    });
+
+    test("stops the release when the package is not private", () => {
+      assert.throws(() => runIn(repo, "release-guard.mjs", "--publish"), guardFailsWith(/"private": true, but the repo publishes/));
     });
   });
 });
