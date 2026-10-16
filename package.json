@@ -1,6 +1,6 @@
 {
   "name": "copier-skills",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Copier template for skill repos. This package.json only runs the template's own tests.",
