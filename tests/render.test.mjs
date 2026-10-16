@@ -241,34 +241,44 @@ describe("hardened CI", () => {
     checkMutation((text) => text.replace(/^jobs:\n/m, "tasks:\n"), /no `jobs:` mapping found/);
   });
 
-  test("the repository check ignores a uses key in a non-step flow mapping", () => {
-    checkMutation((text) => text.replace(/^permissions: \{\}\n/m, "permissions: {}\nenv: { uses: harmless }\n"), null);
-  });
-
-  test("the repository check rejects an unpinned action written as a flow-mapping step", () => {
-    checkMutation(
-      (text) => text.replace(checkoutRef, "uses: actions/checkout@v4").replace("- uses: actions/checkout@v4", "- { name: x, uses: actions/checkout@v4 }"),
-      /not pinned by commit SHA/,
-    );
-  });
-
-  test("the repository check accepts quoted permission levels", () => {
-    checkMutation(withJobPermissions('    permissions:\n      contents: "read"\n      id-token: \'write\''), null);
-    checkMutation(withJobPermissions('    permissions: { contents: "read", id-token: \'write\' }'), null);
-  });
-
-  test("the repository check fails closed on a flow-mapping step it cannot read", () => {
-    checkMutation(
-      (text) => text.replace(checkoutRef, "uses: actions/checkout@v4").replace("- uses: actions/checkout@v4", "- { with: { persist-credentials: false }, uses: actions/checkout@v4 }"),
-      /unsupported flow-mapping step/,
-    );
-  });
-
   test("the repository check fails closed when job ids are not indented two spaces", () => {
     checkMutation(
       (text) => text.replace(/^jobs:\n/m, "jobs:\n    extra:\n        runs-on: ubuntu-latest\n        steps: []\n"),
       /jobs are not indented two spaces/,
     );
+  });
+
+  test("the repository check rejects flow style outside empty collections", () => {
+    for (const [label, transform] of [
+      ["an inline permissions mapping", withJobPermissions("    permissions: { contents: read }")],
+      ["a flow-mapping step", (text) => text.replace(checkoutRef, "uses: actions/checkout@v4").replace("- uses: actions/checkout@v4", "- { name: x, with: { a: b }, uses: actions/checkout@v4 }")],
+      ["a flow-sequence of steps", (text) => text.replace(/^jobs:\n/m, "jobs:\n  extra: { runs-on: ubuntu-latest, steps: [{ uses: actions/checkout@v4 }] }\n")],
+      ["a multi-line flow sequence", (text) => text.replace("- run: npm ci\n", "- run: npm ci\n        with: [\n          a\n        ]\n")],
+    ]) {
+      checkMutation(transform, /flow style is not supported; use block style/);
+    }
+  });
+
+  test("the repository check accepts empty flow collections, expressions and quoted brackets", () => {
+    checkMutation(
+      (text) => text.replace("- run: npm ci\n", '- run: echo "${{ github.sha }} [a] {b}"\n      - run: npm ci\n        env: {}\n'),
+      null,
+    );
+  });
+
+  test("the repository check ignores a uses key that is not a step key", () => {
+    checkMutation((text) => text.replace("- run: npm ci\n", "- run: npm ci\n        env:\n          uses: harmless\n"), null);
+  });
+
+  test("the repository check reads uses as a later key of a step", () => {
+    checkMutation(
+      (text) => text.replace(checkoutRef, "name: checkout\n        uses: actions/checkout@v4"),
+      /not pinned by commit SHA/,
+    );
+  });
+
+  test("the repository check accepts a local action reference", () => {
+    checkMutation((text) => text.replace(checkoutRef, "uses: ./.github/actions/setup"), null);
   });
 
   test("the repository check ignores a commented-out action reference", () => {
@@ -301,7 +311,7 @@ describe("hardened CI", () => {
 
   for (const [label, replacement] of [
     ["an empty mapping", "    permissions: {}"],
-    ["an inline mapping", "    permissions: { contents: write, pull-requests: read }"],
+    ["a block of quoted levels", '    permissions:\n      contents: "read"\n      id-token: \'write\''],
     ["a block of several scopes", "    permissions:\n      contents: read\n      id-token: write # publish"],
   ]) {
     test(`the repository check accepts a job with permissions as ${label}`, () => {

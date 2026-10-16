@@ -1,10 +1,11 @@
 // Dependency-free repository check: the hardening rules CI relies on.
 // Run by `npm run check` from the repo root; exits non-zero and lists every
-// violation. Line-based on purpose (no YAML parser), so it expects the usual
-// block-style layout: top-level keys at column 0, job ids at two spaces
-// (plain or quoted), block scalars (`run: |`) skipped, `uses:` value on the
-// same or the next line. Layouts outside that subset (other job indentation,
-// flow-mapping steps with nested braces) fail the check instead of passing it.
+// violation. Line-based on purpose (no YAML parser), so it reads only block-style
+// YAML: top-level keys at column 0, job ids at two spaces (plain or quoted),
+// `uses:` as a key of a step, block scalars (`run: |`) skipped. Anything outside
+// that subset fails the check instead of passing it: flow collections other than
+// `{}` and `[]`, and other job indentation. Local actions outside
+// .github/actions are not followed.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -25,7 +26,7 @@ const stripComment = (line) => line.replace(/^\s*#.*$|\s+#.*$/, "").trimEnd();
 // text inside a script is never read as YAML structure. Line numbers are kept.
 const readYaml = (path) => {
   let scalarIndent = -1;
-  return readLines(path).map((raw) => {
+  return readLines(path).map((raw, index) => {
     const indent = raw.length - raw.trimStart().length;
     if (scalarIndent >= 0) {
       if (raw.trim() === "" || indent > scalarIndent) return "";
@@ -33,45 +34,48 @@ const readYaml = (path) => {
     }
     const line = stripComment(raw);
     if (/:\s*[|>][+-]?\d*[+-]?$/.test(line)) scalarIndent = indent;
+    // Fail closed on flow collections, which the line reader cannot follow.
+    // Expressions and quoted text may hold brackets, so they are ignored here.
+    const bare = line.replace(/\$\{\{.*?\}\}/g, "").replace(/"[^"]*"|'[^']*'/g, "");
+    if (/(?:^\s*-\s*|:\s+)(?:\{(?!\s*\})|\[(?!\s*\]))/.test(bare)) {
+      problems.push(`${path}:${index + 1}: flow style is not supported; use block style`);
+    }
     return line;
   });
 };
 
-// A job's `permissions:` must be `{}` or scopes set to read, write or none:
-// no scalar such as `write-all`, no expression, no empty block.
-const SCOPE = /^[\w-]+:\s*(["']?)(read|write|none)\1$/;
-const scopedPermissions = (value, children) => {
-  if (value === "{}") return true;
-  if (value.startsWith("{") && value.endsWith("}")) {
-    const pairs = value.slice(1, -1).split(",").map((pair) => pair.trim());
-    return pairs.every((pair) => SCOPE.test(pair));
-  }
-  return value === "" && children.length > 0 && children.every((line) => /^ {6}/.test(line) && SCOPE.test(line.trim()));
-};
+// A job's `permissions:` must be `{}` or a block of scopes set to read, write
+// or none: no scalar such as `write-all`, no expression, no empty block.
+const SCOPE = /^ {6}[\w-]+:\s*(["']?)(read|write|none)\1$/;
+const scopedPermissions = (value, children) =>
+  value === "{}" || (value === "" && children.length > 0 && children.every((line) => SCOPE.test(line)));
 
 // Workflows and local composite actions both reference third-party actions.
-const USES = /(?:^\s*(?:-\s+)*|^\s*-\s*\{(?:[^{}]*,)?\s*)["']?uses["']?\s*:\s*["']?([^\s"',}]*)/g;
+// `uses` only counts as a key of a step (a list item), never as a nested key.
+const USES = /^["']?uses["']?\s*:\s*["']?([^\s"',}]*)/;
 for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
   const lines = readYaml(path);
+  const items = [];
   lines.forEach((line, index) => {
-    const refs = [...line.matchAll(USES)];
-    for (const [, inline] of refs) {
-      let ref = inline;
-      let at = index;
-      if (ref === "") {
-        // The value may sit on the following line.
-        at = lines.findIndex((next, i) => i > index && next.trim() !== "");
-        ref = at < 0 ? "" : lines[at].trim().replace(/^["']|["']$/g, "");
-      }
-      // Local actions have no SHA to pin.
-      if (ref.startsWith("./")) continue;
-      if (!/@[0-9a-f]{40}$/.test(ref) && !/^docker:\/\/.+@sha256:[0-9a-f]{64}$/.test(ref)) {
-        problems.push(`${path}:${at + 1}: \`${ref}\` is not pinned by commit SHA`);
-      }
+    if (line.trim() === "") return;
+    const indent = line.length - line.trimStart().length;
+    while (items.length > 0 && items.at(-1).dash >= indent) items.pop();
+    const dash = /^\s*-\s+/.exec(line);
+    const isStepKey = dash !== null || (items.length > 0 && items.at(-1).key === indent);
+    if (dash) items.push({ dash: indent, key: dash[0].length });
+    const match = isStepKey ? USES.exec(line.slice(dash ? dash[0].length : indent)) : null;
+    if (!match) return;
+    let ref = match[1];
+    let at = index;
+    if (ref === "") {
+      // The value may sit on the following line.
+      at = lines.findIndex((next, i) => i > index && next.trim() !== "");
+      ref = at < 0 ? "" : lines[at].trim().replace(/^["']|["']$/g, "");
     }
-    // Fail closed: a flow-mapping step the pattern cannot read is not "no action".
-    if (refs.length === 0 && /^\s*-\s*\{/.test(line) && /\buses\b/.test(line)) {
-      problems.push(`${path}:${index + 1}: unsupported flow-mapping step; write the step in block style`);
+    // Local actions have no SHA to pin.
+    if (ref.startsWith("./")) return;
+    if (!/@[0-9a-f]{40}$/.test(ref) && !/^docker:\/\/.+@sha256:[0-9a-f]{64}$/.test(ref)) {
+      problems.push(`${path}:${at + 1}: \`${ref}\` is not pinned by commit SHA`);
     }
   });
 }
@@ -113,7 +117,8 @@ for (const path of workflows) {
 }
 
 if (problems.length > 0) {
-  console.error(problems.join("\n"));
+  // Each workflow is read twice, so the same line can be reported twice.
+  console.error([...new Set(problems)].join("\n"));
   process.exit(1);
 }
 console.log(`check-repo: ${workflows.length} workflow(s) ok`);
