@@ -503,6 +503,34 @@ describe("publish_to_npm", () => {
   });
 });
 
+describe("contributing doc", () => {
+  const contributing = (repo) => readFileSync(join(repo, "CONTRIBUTING.md"), "utf8");
+
+  test("carries the setup checklist, layouts and conventions, with npm setup when publishing", () => {
+    const doc = contributing(render({ repo_name: "demo-skills", description: "Demo.", github_owner: "acme" }));
+    assert.match(doc, /^# Contributing to Demo Skills$/m);
+    assert.match(doc, /create and approve pull requests/);
+    assert.match(doc, /`check` status check/);
+    assert.match(doc, /close and reopen/i);
+    assert.match(doc, /trusted publisher: .*owner `acme`, repository `demo-skills`, workflow `release\.yml`/);
+    assert.match(doc, /references\//);
+    assert.match(doc, /evals\//);
+    assert.match(doc, /Conventional Commits/);
+    assert.ok(!doc.includes("{{") && !doc.includes("{%"), "no unrendered template syntax");
+  });
+
+  test("drops the npm step when not publishing", () => {
+    const doc = contributing(render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false }));
+    assert.doesNotMatch(doc, /trusted publisher/i);
+    assert.match(doc, /no npm setup is needed/);
+  });
+
+  test("is template-owned: copier update is free to merge it", () => {
+    const copier = readFileSync(join(templateRoot, "copier.yml"), "utf8");
+    assert.doesNotMatch(copier, /CONTRIBUTING/);
+  });
+});
+
 describe("invalid answers", () => {
   for (const question of ["description", "author_name", "author_url"]) {
     for (const [label, value] of [["empty", ""], ["whitespace-only", "   "]]) {

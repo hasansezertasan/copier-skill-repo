@@ -1,0 +1,46 @@
+# Contributing to {{ display_name }}
+
+This file is owned by the [copier-skills](https://github.com/hasansezertasan/copier-skills) template and is merged on `copier update`. Put repo-specific guidance in `README.md`, which the template never overwrites.
+
+## How the repo works
+
+- Skills live under `.ai-rulez/skills/<name>/`. That directory is the source of truth.
+- `skills/`, `AGENTS.md` and the plugin and marketplace manifests are generated output. Never edit them by hand.
+- After changing anything under `.ai-rulez/`, run `npm run generate` and commit the result.
+- `npm run check` is what CI runs. It fails when generated output has drifted.
+- Node comes from `.node-version`.
+
+## Skill layout
+
+The template owns the scaffold, not a skill's content. A skill is a directory:
+
+```text
+.ai-rulez/skills/<name>/
+├── SKILL.md       required
+├── references/    optional: files the skill loads on demand
+├── evals/         optional: test prompts and expected outcomes
+└── scripts/       optional: helpers the skill runs
+```
+
+Only `SKILL.md` is required. The other directories are a convention the template describes and never creates, checks or overwrites.
+
+## Commits and pull requests
+
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[(scope)][!]: <description>`.
+- Pull request titles use the same format, because release-please builds the changelog and picks the next version from them.
+- `feat` bumps the minor version, `fix` the patch. A `!` or a `BREAKING CHANGE:` footer marks a breaking change.
+- Branch names are `<type>/<description>`, lowercase and hyphenated (`feature`, `bugfix`, `hotfix`, `release`, `chore`).
+
+## One-time repository setup
+
+None of these settings can be read from the repository, so CI cannot catch a missing one. Do them once after creating the repo on GitHub.
+
+- [ ] **Allow Actions to open pull requests.** Settings → Actions → General → Workflow permissions → tick "Allow GitHub Actions to create and approve pull requests". Without it release-please cannot open its release PR.
+- [ ] **Protect `main`.** Settings → Rules (or Branches) → require a pull request and require the `check` status check to pass before merging.
+- [ ] **Close and reopen the first release PR.** release-please runs on the implicit `GITHUB_TOKEN`, and events created with that token start no workflow runs. The release PR therefore reports no required checks until you close and reopen it (`check.yml` runs on `reopened`). Repeat for every release PR.
+{%- if publish_to_npm %}
+- [ ] **Register the npm trusted publisher.** On npmjs.com, open the package's settings and add a trusted publisher: provider GitHub Actions, owner `{{ github_owner }}`, repository `{{ repo_name }}`, workflow `release.yml`, no environment. The `publish` job authenticates with OIDC, so no npm token is stored in the repo.
+{%- else %}
+
+`publish_to_npm` is off, so `package.json` is `"private": true` and no npm setup is needed. Pi users install from git.
+{%- endif %}
