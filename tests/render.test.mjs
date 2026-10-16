@@ -577,6 +577,80 @@ describe("release safeguards", () => {
     assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /read-only job runs `npm run generate`/);
   });
 
+  describe("the push job's patch allowlist", () => {
+    // The push job's own shell, run for real in a scratch git repo with the
+    // final `git push` stubbed out.
+    const git = (cwd, ...args) =>
+      execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { cwd, stdio: "pipe" });
+    const pushScript = () => {
+      const release = readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
+      // `\n  push:\n    needs` is the job; a bare `push:` also starts the `on:` trigger.
+      const job = release.slice(release.indexOf("\n  push:\n    needs"));
+      const body = job.slice(job.indexOf("run: |\n") + "run: |\n".length).split(/\n(?=  [a-z-]+:\n)/)[0];
+      const script = body.split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n");
+      assert.match(script, /git push origin "HEAD:\$BRANCH"/);
+      return script.replace('git push origin "HEAD:$BRANCH"', "true");
+    };
+    // Applies a patch that writes `files` over a baseline commit; reports the
+    // script's exit status, stderr and whether it made a commit.
+    const run = (files) => {
+      const dir = scratchDir();
+      git(dir, "init", "-q", "-b", "main");
+      writeFileSync(join(dir, ".ai-rulez-generated.json"), "{}\n");
+      writeFileSync(join(dir, "AGENTS.md"), "old\n");
+      git(dir, "add", "-A");
+      git(dir, "commit", "-q", "-m", "base");
+      for (const [path, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true });
+        writeFileSync(join(dir, path), text);
+      }
+      git(dir, "add", "-A");
+      const patchPath = join(scratchDir(), "regenerate.patch");
+      writeFileSync(patchPath, git(dir, "diff", "--cached", "--binary"));
+      git(dir, "reset", "-q", "--hard");
+      git(dir, "clean", "-qfd");
+      const before = git(dir, "rev-parse", "HEAD").toString();
+      try {
+        execFileSync("bash", ["-ec", pushScript()], {
+          cwd: dir,
+          stdio: "pipe",
+          env: { ...process.env, RUNNER_TEMP: dirname(patchPath), BRANCH: "release-please--branches--main" },
+        });
+        return { ok: true, committed: git(dir, "rev-parse", "HEAD").toString() !== before, stderr: "" };
+      } catch (error) {
+        return { ok: false, committed: git(dir, "rev-parse", "HEAD").toString() !== before, stderr: String(error.stderr) };
+      }
+    };
+
+    test("pushes generated output, including an exact AGENTS.md", () => {
+      const result = run({ ".ai-rulez-generated.json": '{"a":1}\n', "AGENTS.md": "new\n", "skills/new/SKILL.md": "x\n" });
+      assert.deepEqual([result.ok, result.committed], [true, true], result.stderr);
+    });
+
+    for (const path of [
+      "AGENTS.md.evil",
+      ".github/workflows/evil.yml",
+      "skills-evil/x",
+      ".agents-evil/x",
+      ".ai-rulez-generated.json.evil",
+      "package.json",
+    ]) {
+      test(`refuses ${path}`, () => {
+        const result = run({ [path]: "x\n" });
+        assert.equal(result.ok, false);
+        assert.equal(result.committed, false);
+        assert.match(result.stderr, /Refusing to push: .* is not generated output/);
+      });
+    }
+  });
+
+  test("starts the regenerate job's staging from a clean index", () => {
+    const release = readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
+    // Dependency code from `npm ci` may stage files; only the listed paths may
+    // enter the commit.
+    assert.match(release, /npm run generate\n(\s+#[^\n]*\n)+\s+git reset -q\n(\s+#[^\n]*\n)+\s+for path in /);
+  });
+
   test("a release bump fails the check until the output is regenerated", () => {
     // release-please bumps these files and cannot touch the hash ledger.
     const bumped = render({ repo_name: "bump-skills", description: "Demo." });
