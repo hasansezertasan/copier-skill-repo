@@ -532,6 +532,12 @@ describe("release safeguards", () => {
     assert.match(check, /^  workflow_dispatch:$/m);
     assert.doesNotMatch(check, /inputs/);
     assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /gh workflow run check\.yml --ref release-please--branches--main/);
+    const contributing = readFileSync(join(repo, "CONTRIBUTING.md"), "utf8");
+    assert.match(contributing, /^## Release flow$/m);
+    assert.match(contributing, /^## Recovery$/m);
+    assert.match(contributing, /sole pending release/);
+    assert.match(contributing, /`publish` job then publishes the package to npm/);
+    assert.doesNotMatch(contributing, /scoop/i);
   });
 
   test("keeps both workflows within the hardened CI rules", () => {
@@ -610,6 +616,8 @@ describe("contributing doc", () => {
     const doc = contributing(render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false }));
     assert.doesNotMatch(doc, /trusted publisher/i);
     assert.match(doc, /no npm setup is needed/);
+    assert.match(doc, /nothing is published to a registry/);
+    assert.doesNotMatch(doc, /publishes the package to npm|failed `publish` job/);
   });
 
   test("is template-owned: copier update is free to merge it", () => {
@@ -777,6 +785,19 @@ describe("four runtimes", () => {
       assert.doesNotMatch(doc, /"paths"/);
       assert.match(doc, /pi install npm:demo-skills/);
       assert.match(doc, /pi install git:github\.com\/acme\/demo-skills/);
+      // The agent-facing page: a prompt, instructions for the reading agent and a
+      // route table with install, update and confirm columns.
+      assert.match(doc, /Install the demo-skills skills: pick the best installation method for\nyou from https:\/\/github\.com\/acme\/demo-skills\/blob\/main\/docs\/installation\.md/);
+      assert.match(doc, /^## For agents reading this page$/m);
+      assert.match(doc, /^\| Runtime \| Install \| Update \| Confirm \|$/m);
+      for (const runtime of ["Claude Code", "Codex", "OpenCode", "Pi", "Manual"]) {
+        assert.match(doc, new RegExp(`^\\| ${runtime} \\|`, "m"), `${runtime} row`);
+      }
+      assert.doesNotMatch(doc, /scoop/i, "no text borrowed from another repo");
+      // A bare `pi update` updates Pi itself; a package needs its source.
+      assert.match(doc, /`pi update npm:demo-skills`/);
+      assert.match(doc, /`pi update git:github\.com\/acme\/demo-skills`/);
+      assert.doesNotMatch(doc, /`pi update`, then/);
       assert.match(doc, /Open question/);
       assert.ok(!doc.includes("{{") && !doc.includes("{%"), "no unrendered template syntax");
     });
@@ -796,6 +817,8 @@ describe("four runtimes", () => {
   test("offers Pi from git only when not publishing to npm", () => {
     const doc = read(render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false }), "docs/installation.md");
     assert.doesNotMatch(doc, /pi install npm:/);
+    assert.doesNotMatch(doc, /pi update npm:/);
+    assert.match(doc, /`pi update git:/);
     assert.match(doc, /pi install git:/);
   });
 });
