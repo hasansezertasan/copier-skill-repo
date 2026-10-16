@@ -31,6 +31,23 @@ Only `SKILL.md` is required. The other directories are a convention the template
 - `feat` bumps the minor version, `fix` the patch. A `!` or a `BREAKING CHANGE:` footer marks a breaking change.
 - Branch names are `<type>/<description>`, lowercase and hyphenated (`feature`, `bugfix`, `hotfix`, `release`, `chore`).
 
+## Release flow
+
+`package.json` is the sole version source. release-please bumps it, and bumps the generated plugin manifests alongside it, so no copy of the version is kept in sync by hand. The first release is 0.1.0. Before 1.0, a breaking change or a `feat` bumps the minor version and a `fix` bumps the patch.
+
+1. On `main`, the `release` workflow runs the same `check` workflow as CI, then `scripts/release-guard.mjs`, which stops the release when the versions disagree.
+2. release-please opens or updates a release PR with the version bump and the changelog.
+3. Review the whole PR, generated files included, and merge it once its checks pass.
+4. The next `release` run creates the `vX.Y.Z` tag and GitHub Release for that merge, but only if it is the sole pending release (`scripts/release-merge.mjs`).
+{%- if publish_to_npm %}
+5. The `publish` job then publishes the package to npm with provenance.
+
+The artifact is the npm package and the tagged repository tree.
+{%- else %}
+
+The artifact is the tagged repository tree; nothing is published to a registry.
+{%- endif %}
+
 ## One-time repository setup
 
 None of these settings can be read from the repository, so CI cannot catch a missing one. Do them once after creating the repo on GitHub.
@@ -43,4 +60,12 @@ None of these settings can be read from the repository, so CI cannot catch a mis
 {%- else %}
 
 `publish_to_npm` is off, so `package.json` is `"private": true` and no npm setup is needed. Pi users install from git.
+{%- endif %}
+
+## Recovery
+
+If validation of a release merge fails transiently, rerun that merge's failed workflow. A new green push, or a manual run on a later commit, does not authorize releasing the older pending merge: `scripts/release-merge.mjs` allows a release only for the one pending release PR that merged as the commit being released.
+{%- if publish_to_npm %}
+
+If the release was created but `publish` failed, rerun the failed `publish` job from the same `release` run rather than starting a new release.
 {%- endif %}
