@@ -540,6 +540,42 @@ describe("release safeguards", () => {
     assert.doesNotMatch(contributing, /scoop/i);
   });
 
+  test("regenerates the plugin output on the release branch", () => {
+    const release = readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
+    assert.match(release, /if: \$\{\{ steps\.release\.outputs\.prs_created == 'true' \}\}/);
+    assert.match(release, /ref: \$\{\{ fromJSON\(steps\.release\.outputs\.pr \|\| '\{\}'\)\.headBranchName \}\}/);
+    // Commit, then check the committed tree, then push: strict validation fails
+    // on uncommitted generated output, and a failed check must not push.
+    assert.match(release, /git commit -m "chore: regenerate plugin output for the release"[\s\S]*npm run check\n\s+git push origin "HEAD:\$BRANCH"/);
+    assert.match(release, /npm run generate\n/);
+    assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /regenerates the plugin output on that branch/);
+  });
+
+  test("a release bump fails the check until the output is regenerated", () => {
+    // release-please bumps these files and cannot touch the hash ledger.
+    const bumped = render({ repo_name: "bump-skills", description: "Demo." });
+    const options = { cwd: bumped, stdio: "pipe", timeout: FIVE_MINUTES };
+    execFileSync("npm", ["ci"], options);
+    const bump = (path, update) => {
+      const data = readJson(bumped, path);
+      update(data);
+      writeFileSync(join(bumped, path), `${JSON.stringify(data, null, 2)}\n`);
+    };
+    bump("package.json", (d) => (d.version = "0.2.0"));
+    bump(".release-please-manifest.json", (d) => (d["."] = "0.2.0"));
+    bump(".claude-plugin/plugin.json", (d) => (d.version = "0.2.0"));
+    bump(".claude-plugin/marketplace.json", (d) => (d.plugins[0].version = "0.2.0"));
+    bump(".codex-plugin/plugin.json", (d) => (d.version = "0.2.0"));
+    // The release guard is satisfied: every version moved together.
+    execFileSync("node", ["scripts/release-guard.mjs", "--publish"], options);
+    assert.throws(
+      () => execFileSync("npm", ["run", "check"], options),
+      (error) => /Drifted plugin outputs/.test(String(error.stdout) + String(error.stderr)) && /\.ai-rulez-generated\.json/.test(String(error.stdout) + String(error.stderr)),
+    );
+    execFileSync("npm", ["run", "generate"], options);
+    execFileSync("npm", ["run", "check"], options);
+  });
+
   test("keeps both workflows within the hardened CI rules", () => {
     execFileSync("node", ["scripts/check-repo.mjs"], { cwd: repo, stdio: "pipe" });
   });
