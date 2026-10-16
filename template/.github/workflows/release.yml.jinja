@@ -7,6 +7,12 @@ on:
 
 permissions: {}
 
+# Preserve a running tag or release operation; a queued run can still be
+# superseded by a newer one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   check:
     permissions:
@@ -37,17 +43,35 @@ jobs:
     outputs:
       release_created: ${{ '{{' }} steps.release.outputs.release_created {{ '}}' }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      # release-please can otherwise release an older pending, failed merge on a
+      # later green push. Require a single pending release merged as this commit.
+      - id: release-merge
+        env:
+          GH_TOKEN: ${{ '{{' }} github.token {{ '}}' }}
+          REPO: ${{ '{{' }} github.repository {{ '}}' }}
+          SHA: ${{ '{{' }} github.sha {{ '}}' }}
+        run: |
+          gh api --paginate --slurp "repos/$REPO/pulls?state=closed&base=main&per_page=100" > "$RUNNER_TEMP/closed-prs.json"
+          node scripts/release-merge.mjs --pulls "$RUNNER_TEMP/closed-prs.json" --sha "$SHA" >> "$GITHUB_OUTPUT"
       # Runs with the implicit GITHUB_TOKEN on purpose: a PAT or App token would
       # be a standing credential with write access to main. The cost is that
       # events created with GITHUB_TOKEN start no workflow runs, so the release
       # PR reports no required checks until someone closes and reopens it
-      # (check.yml runs on `reopened`). The repository setting "Allow GitHub
-      # Actions to create and approve pull requests" must also be on.
+      # (check.yml runs on `reopened` and can be dispatched on the release
+      # branch). The repository setting "Allow GitHub Actions to create and
+      # approve pull requests" must also be on.
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-release: ${{ '{{' }} steps.release-merge.outputs.is-release-merge != 'true' {{ '}}' }}
 {%- if publish_to_npm %}
 
   publish:
