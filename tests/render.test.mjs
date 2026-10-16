@@ -462,6 +462,81 @@ describe("release", () => {
   });
 });
 
+describe("release safeguards", () => {
+  let repo;
+  const releaseMerge = (pulls, sha) => {
+    const file = join(scratchDir(), "pulls.json");
+    writeFileSync(file, typeof pulls === "string" ? pulls : JSON.stringify(pulls));
+    return execFileSync("node", ["scripts/release-merge.mjs", "--pulls", file, "--sha", sha], {
+      cwd: repo,
+      stdio: "pipe",
+      timeout: FIVE_MINUTES,
+    })
+      .toString()
+      .trim();
+  };
+  const pr = (sha, overrides = {}) => ({
+    merged_at: "2026-10-16T00:00:00Z",
+    base: { ref: "main" },
+    labels: [{ name: "autorelease: pending" }],
+    merge_commit_sha: sha,
+    ...overrides,
+  });
+  const failsCleanly = (pattern) => (error) =>
+    error.status === 1 && !/\n\s+at .*:\d+:\d+/.test(String(error.stderr)) && pattern.test(String(error.stderr));
+
+  before(() => {
+    repo = render({ repo_name: "demo-skills", description: "Demo." });
+  });
+
+  test("allows the sole pending release merged as the validated commit", () => {
+    assert.equal(releaseMerge([[pr("abc")]], "abc"), "is-release-merge=true");
+    assert.equal(releaseMerge([[pr("old", { labels: [{ name: "autorelease: tagged" }] })], [pr("abc")]], "abc"), "is-release-merge=true");
+  });
+
+  test("refuses a stale pending merge on a later commit", () => {
+    assert.equal(releaseMerge([[pr("abc")]], "later"), "is-release-merge=false");
+  });
+
+  test("refuses two pending merges, even when one matches", () => {
+    assert.equal(releaseMerge([[pr("abc")], [pr("def")]], "abc"), "is-release-merge=false");
+  });
+
+  test("ignores unmerged, other-branch and unlabelled pull requests", () => {
+    const noise = [pr("abc", { merged_at: null }), pr("abc", { base: { ref: "dev" } }), pr("abc", { labels: [] })];
+    assert.equal(releaseMerge([noise], "abc"), "is-release-merge=false");
+    assert.equal(releaseMerge([[...noise, pr("abc")]], "abc"), "is-release-merge=true");
+  });
+
+  test("refuses when there is no pending release at all", () => {
+    assert.equal(releaseMerge([[]], "abc"), "is-release-merge=false");
+  });
+
+  test("fails cleanly on unreadable input and bad usage", () => {
+    assert.throws(() => releaseMerge("not json", "abc"), failsCleanly(/cannot read as JSON/));
+    assert.throws(() => releaseMerge({ not: "pages" }, "abc"), failsCleanly(/expected an array of pages/));
+    assert.throws(
+      () => execFileSync("node", ["scripts/release-merge.mjs"], { cwd: repo, stdio: "pipe" }),
+      failsCleanly(/usage/),
+    );
+  });
+
+  test("wires the guard, a non-cancelling concurrency group and the dispatch check", () => {
+    const release = readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
+    assert.match(release, /^concurrency:\n  group: release\n  cancel-in-progress: false$/m);
+    assert.match(release, /node scripts\/release-merge\.mjs/);
+    assert.match(release, /skip-github-release: \$\{\{ steps\.release-merge\.outputs\.is-release-merge != 'true' \}\}/);
+    const check = readFileSync(join(repo, ".github/workflows/check.yml"), "utf8");
+    assert.match(check, /^  workflow_dispatch:\n    inputs:\n      ref:/m);
+    assert.match(check, /ref: \$\{\{ inputs\.ref \|\| github\.sha \}\}/);
+    assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /gh workflow run check\.yml --ref release-please--branches--main/);
+  });
+
+  test("keeps both workflows within the hardened CI rules", () => {
+    execFileSync("node", ["scripts/check-repo.mjs"], { cwd: repo, stdio: "pipe" });
+  });
+});
+
 describe("rendered with no answers at all", () => {
   test("takes repo_name from the destination folder and passes its own check", () => {
     const repo = render({}, "bare-skills");
