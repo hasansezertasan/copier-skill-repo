@@ -397,6 +397,7 @@ describe("release", () => {
       assert.match(workflow, /id-token: write/);
       assert.match(workflow, /npm publish --provenance/);
       assert.match(workflow, /release-guard\.mjs --publish/);
+      assert.match(workflow, /issues: write/);
     });
 
     test("keeps the release workflow within the hardened CI rules", () => {

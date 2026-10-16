@@ -32,10 +32,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write # release-please manages PR labels through the Issues API
       pull-requests: write
     outputs:
       release_created: ${{ '{{' }} steps.release.outputs.release_created {{ '}}' }}
     steps:
+      # Runs with the implicit GITHUB_TOKEN on purpose: a PAT or App token would
+      # be a standing credential with write access to main. The cost is that
+      # events created with GITHUB_TOKEN start no workflow runs, so the release
+      # PR reports no required checks until someone closes and reopens it
+      # (check.yml runs on `reopened`). The repository setting "Allow GitHub
+      # Actions to create and approve pull requests" must also be on.
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
