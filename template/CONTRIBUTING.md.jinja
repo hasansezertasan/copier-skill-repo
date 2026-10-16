@@ -36,7 +36,7 @@ Only `SKILL.md` is required. The other directories are a convention the template
 `package.json` is the sole version source. release-please bumps it, and bumps the generated plugin manifests alongside it, so no copy of the version is kept in sync by hand. The first release is 0.1.0. Before 1.0, a breaking change or a `feat` bumps the minor version and a `fix` bumps the patch.
 
 1. On `main`, the `release` workflow runs the same `check` workflow as CI, then `scripts/release-guard.mjs`, which stops the release when the versions disagree.
-2. release-please opens or updates a release PR with the version bump and the changelog.
+2. release-please opens or updates a release PR with the version bump and the changelog. The workflow then regenerates the plugin output on that branch, because release-please cannot update the hash ledger `.ai-rulez-generated.json`: a read-only job runs `npm run generate` and `npm run check` and hands over a patch, and a separate job holding the write token applies it after checking that it touches only generated paths.
 3. Review the whole PR, generated files included, and merge it once its checks pass.
 4. The next `release` run creates the `vX.Y.Z` tag and GitHub Release for that merge, but only if it is the sole pending release (`scripts/release-merge.mjs`).
 {%- if publish_to_npm %}

@@ -42,6 +42,8 @@ jobs:
       pull-requests: write
     outputs:
       release_created: ${{ '{{' }} steps.release.outputs.release_created {{ '}}' }}
+      prs_created: ${{ '{{' }} steps.release.outputs.prs_created {{ '}}' }}
+      pr_branch: ${{ '{{' }} fromJSON(steps.release.outputs.pr || '{}').headBranchName {{ '}}' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,6 +74,91 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-release: ${{ '{{' }} steps.release-merge.outputs.is-release-merge != 'true' {{ '}}' }}
+
+  # release-please bumps package.json and the plugin manifests, but cannot update
+  # the hash ledger (.ai-rulez-generated.json) that `npm run check` verifies, so
+  # the release PR would fail its own check. Regenerate the output on the release
+  # branch. The work is split so that no code from a dependency runs next to a
+  # write token: `regenerate` installs and runs the scripts with read-only access
+  # and hands over a patch; `push` holds the write token and only applies it.
+  regenerate:
+    needs: release-please
+    if: ${{ '{{' }} needs.release-please.outputs.prs_created == 'true' {{ '}}' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ '{{' }} steps.regenerate.outputs.changed {{ '}}' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ '{{' }} needs.release-please.outputs.pr_branch {{ '}}' }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - id: regenerate
+        run: |
+          npm ci
+          npm run generate
+          # Only generated output, and only what exists in this repo.
+          for path in AGENTS.md skills .claude-plugin .codex-plugin .agents .ai-rulez-generated.json .ai-rulez/.generated-manifest.json; do
+            if [ -e "$path" ]; then git add -A -- "$path"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "Generated output already matches the release version."
+            npm run check
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: regenerate plugin output for the release"
+          # Check the committed tree: strict validation reports plugin-version
+          # drift (AR961) while generated output differs from HEAD. A failing
+          # check stops the job before anything is handed over.
+          npm run check
+          git diff --binary HEAD~1 HEAD > "$RUNNER_TEMP/regenerate.patch"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - if: ${{ '{{' }} steps.regenerate.outputs.changed == 'true' {{ '}}' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: regenerate-patch
+          path: ${{ '{{' }} runner.temp {{ '}}' }}/regenerate.patch
+          if-no-files-found: error
+
+  push:
+    needs: [release-please, regenerate]
+    if: ${{ '{{' }} needs.regenerate.outputs.changed == 'true' {{ '}}' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # This job runs no npm and no repository script: it applies a patch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ '{{' }} needs.release-please.outputs.pr_branch {{ '}}' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: regenerate-patch
+          path: ${{ '{{' }} runner.temp {{ '}}' }}
+      - env:
+          BRANCH: ${{ '{{' }} needs.release-please.outputs.pr_branch {{ '}}' }}
+        run: |
+          patch="$RUNNER_TEMP/regenerate.patch"
+          # Refuse anything that is not generated output.
+          allowed='^(AGENTS\.md|skills/|\.claude-plugin/|\.codex-plugin/|\.agents/|\.ai-rulez-generated\.json$|\.ai-rulez/\.generated-manifest\.json$)'
+          while IFS=$'\t' read -r _ _ path; do
+            if [[ ! "$path" =~ $allowed ]]; then
+              echo "Refusing to push: $path is not generated output" >&2
+              exit 1
+            fi
+          done < <(git apply --numstat "$patch")
+          git apply --index "$patch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: regenerate plugin output for the release"
+          git push origin "HEAD:$BRANCH"
 {%- if publish_to_npm %}
 
   publish:
