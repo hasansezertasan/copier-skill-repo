@@ -540,15 +540,41 @@ describe("release safeguards", () => {
     assert.doesNotMatch(contributing, /scoop/i);
   });
 
-  test("regenerates the plugin output on the release branch", () => {
+  test("regenerates the plugin output without running dependency code next to a write token", () => {
     const release = readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
-    assert.match(release, /if: \$\{\{ steps\.release\.outputs\.prs_created == 'true' \}\}/);
-    assert.match(release, /ref: \$\{\{ fromJSON\(steps\.release\.outputs\.pr \|\| '\{\}'\)\.headBranchName \}\}/);
-    // Commit, then check the committed tree, then push: strict validation fails
-    // on uncommitted generated output, and a failed check must not push.
-    assert.match(release, /git commit -m "chore: regenerate plugin output for the release"[\s\S]*npm run check\n\s+git push origin "HEAD:\$BRANCH"/);
-    assert.match(release, /npm run generate\n/);
-    assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /regenerates the plugin output on that branch/);
+    // Job bodies, keyed by job id.
+    const withoutComments = release
+      .split("\n")
+      .filter((line) => !/^\s*#/.test(line))
+      .join("\n");
+    const jobs = Object.fromEntries(
+      [...withoutComments.split(/^jobs:\n/m)[1].matchAll(/^  ([a-z-]+):\n([\s\S]*?)(?=^  [a-z-]+:\n|(?![\s\S]))/gm)].map((m) => [m[1], m[2]]),
+    );
+    assert.ok(jobs.regenerate && jobs.push, "regenerate and push jobs exist");
+    // release-please and push hold write tokens: neither installs packages or
+    // runs an npm script. release-please runs only its own dependency-free node
+    // script; push runs no node at all.
+    for (const id of ["release-please", "push"]) {
+      assert.match(jobs[id], /contents: write/, `${id} holds the write token`);
+      assert.doesNotMatch(jobs[id], /\bnpm\b/, `${id} runs no npm`);
+    }
+    assert.doesNotMatch(jobs.push, /setup-node|\bnode\b/, "push runs no node");
+    // regenerate runs npm with read-only access and no stored credentials.
+    assert.match(jobs.regenerate, /permissions:\n      contents: read\n/);
+    assert.doesNotMatch(jobs.regenerate, /write/);
+    assert.match(jobs.regenerate, /persist-credentials: false/);
+    assert.match(jobs.regenerate, /npm ci\n\s+npm run generate/);
+    // Commit, then check the committed tree, then hand over: strict validation
+    // fails on uncommitted generated output.
+    assert.match(jobs.regenerate, /git commit -m "chore: regenerate plugin output for the release"[\s\S]*npm run check\n\s+git diff --binary HEAD~1 HEAD/);
+    assert.match(jobs.regenerate, /if: \$\{\{ steps\.regenerate\.outputs\.changed == 'true' \}\}\n\s+uses: actions\/upload-artifact@[0-9a-f]{40}/);
+    // push applies only generated paths, from the artifact, and pushes the branch.
+    assert.match(jobs.push, /needs: \[release-please, regenerate\]/);
+    assert.match(jobs.push, /actions\/download-artifact@[0-9a-f]{40}/);
+    assert.match(jobs.push, /Refusing to push: \$path is not generated output/);
+    assert.match(jobs.push, /git apply --index "\$patch"/);
+    assert.match(jobs.push, /git push origin "HEAD:\$BRANCH"/);
+    assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /read-only job runs `npm run generate`/);
   });
 
   test("a release bump fails the check until the output is regenerated", () => {
