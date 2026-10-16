@@ -8,7 +8,6 @@
 // Preconditions:
 //   - package.json, the release-please manifest and every generated plugin
 //     manifest carry the same version, so a release PR cannot leave drift;
-//   - CHANGELOG.md exists, because release-please prepends to it;
 //   - the mode matches package.json: `--publish` needs a public package,
 //     `--private` needs `"private": true`.
 import { readFileSync } from "node:fs";
@@ -46,12 +45,6 @@ for (const [path, version] of Object.entries(versions)) {
   if (typeof version !== "string" || version !== versions["package.json"]) {
     problems.push(`${path}: version ${JSON.stringify(version)} does not match package.json ${JSON.stringify(versions["package.json"])}`);
   }
-}
-
-try {
-  readFileSync("CHANGELOG.md");
-} catch {
-  problems.push("CHANGELOG.md: missing");
 }
 
 if (pkg) {

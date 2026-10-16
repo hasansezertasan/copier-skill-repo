@@ -381,7 +381,7 @@ describe("release", () => {
 
     test("lets release-please own the version, changelog and manifest", () => {
       assert.deepEqual(readJson(repo, ".release-please-manifest.json"), { ".": "0.1.0" });
-      assert.ok(existsSync(join(repo, "CHANGELOG.md")));
+      assert.ok(!existsSync(join(repo, "CHANGELOG.md")), "release-please creates the changelog itself");
       const config = readJson(repo, "release-please-config.json").packages["."];
       assert.equal(config["release-type"], "node");
       assert.deepEqual(config["extra-files"].map((file) => file.path).sort(), [
@@ -413,17 +413,6 @@ describe("release", () => {
       writeFileSync(path, original.replace('"version": "0.1.0"', '"version": "9.9.9"'));
       try {
         assert.throws(() => runIn(repo, "release-guard.mjs", "--publish"), guardFailsWith(/\.codex-plugin\/plugin\.json: version "9\.9\.9"/));
-      } finally {
-        writeFileSync(path, original);
-      }
-    });
-
-    test("stops the release when the changelog is missing", () => {
-      const path = join(repo, "CHANGELOG.md");
-      const original = readFileSync(path);
-      rmSync(path);
-      try {
-        assert.throws(() => runIn(repo, "release-guard.mjs", "--publish"), guardFailsWith(/CHANGELOG\.md: missing/));
       } finally {
         writeFileSync(path, original);
       }

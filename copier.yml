@@ -2,9 +2,9 @@ _min_copier_version: "9.4.0"
 _subdirectory: template
 _answers_file: .copier-answers.yml
 
-# Repo-owned files: release-please rewrites them, so `copier update` leaves them be.
+# The manifest holds the released version; release-please owns it, so
+# `copier update` must not reset it.
 _skip_if_exists:
-  - CHANGELOG.md
   - .release-please-manifest.json
 
 # Generated output (skills/, plugin manifests, marketplace catalogs) is never
