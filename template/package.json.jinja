@@ -14,7 +14,10 @@
     "type": "git",
     "url": "{{ repo_url }}"
   },
-  "keywords": {{ keywords_json | tojson }},
+  "keywords": {{ (keywords_json + ["pi-package"]) | unique | list | tojson }},
+  "pi": {
+    "skills": ["./skills"]
+  },
   "engines": {
     "node": ">=20"
   },
