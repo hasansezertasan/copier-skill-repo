@@ -34,7 +34,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 ## Docs and ownership
 
 - Template-owned and three-way merged: `CONTRIBUTING.md` (includes the manual one-time setup checklist and a note on `references/` and `evals/` layouts) and `docs/installation.md` (per-runtime install steps).
-- Repo-owned (never overwritten): `.ai-rulez/skills/**`, the release-please manifest, and `version` in `package.json`. `README.md` is a three-way merged skeleton; `CHANGELOG.md` is created by release-please.
+- Repo-owned (never overwritten): the release-please manifest and `version` in `package.json`. Skills are not in `_skip_if_exists`: a skip pattern makes Copier recreate a deleted placeholder on every update, while the three-way merge keeps a deleted placeholder deleted and never touches skills the template does not ship. `README.md` is a three-way merged skeleton; `CHANGELOG.md` is created by release-please.
 - Not owned: maintainers docs and per-repo ADRs.
 
 ## Rollout

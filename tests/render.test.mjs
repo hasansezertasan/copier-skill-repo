@@ -555,6 +555,7 @@ describe("copier update", () => {
     writeFileSync(join(dir, path), before.replace(from, to));
   };
   let repo;
+  let gone;
 
   before(() => {
     // The earlier template state: a git repo of the working tree, tagged.
@@ -575,14 +576,24 @@ describe("copier update", () => {
         stdio: "pipe",
         timeout: FIVE_MINUTES,
       });
-    copier(["copy", "--vcs-ref", "v1.0.0", "--data-file", dataFile, source, repo]);
-    git(repo, "init", "-q", "-b", "main");
-    git(repo, "add", "-A");
-    git(repo, "commit", "-q", "-m", "chore: generate");
+    gone = join(scratchDir(), "demo-skills");
+    for (const dest of [repo, gone]) {
+      copier(["copy", "--vcs-ref", "v1.0.0", "--data-file", dataFile, source, dest]);
+      git(dest, "init", "-q", "-b", "main");
+      git(dest, "add", "-A");
+      git(dest, "commit", "-q", "-m", "chore: generate");
+    }
+
+    // A second repo replaced the placeholder with its own skill and deleted it.
+    rmSync(join(gone, ".ai-rulez/skills/hello"), { recursive: true });
+    mkdirSync(join(gone, ".ai-rulez/skills/real"), { recursive: true });
+    writeFileSync(join(gone, ".ai-rulez/skills/real/SKILL.md"), "---\nname: real\ndescription: Real.\n---\n");
+    git(gone, "add", "-A");
+    git(gone, "commit", "-q", "-m", "chore: replace placeholder");
 
     // Local edits: repo-owned files, and a local edit inside template-owned ones.
     writeFileSync(join(repo, "README.md"), "# My own README\n");
-    edit(repo, ".ai-rulez/skills/hello/SKILL.md", "Placeholder skill", "A real skill");
+    writeFileSync(join(repo, ".ai-rulez/skills/hello/SKILL.md"), `${read(repo, ".ai-rulez/skills/hello/SKILL.md")}\nLocal addition.\n`);
     mkdirSync(join(repo, ".ai-rulez/skills/real"), { recursive: true });
     writeFileSync(join(repo, ".ai-rulez/skills/real/SKILL.md"), "---\nname: real\ndescription: Real.\n---\n");
     writeFileSync(join(repo, "CHANGELOG.md"), "# Changelog\n\n## 0.3.0\n");
@@ -601,20 +612,33 @@ describe("copier update", () => {
     git(source, "commit", "-q", "-m", "later state");
     git(source, "tag", "v1.1.0");
 
-    try {
-      copier(["update", "--vcs-ref", "v1.1.0"], repo);
-    } catch (error) {
-      throw new Error(`copier update failed: ${error.stderr}${error.stdout}`);
+    for (const dest of [repo, gone]) {
+      try {
+        copier(["update", "--vcs-ref", "v1.1.0"], dest);
+      } catch (error) {
+        throw new Error(`copier update failed: ${error.stderr}${error.stdout}`);
+      }
     }
   });
 
   test("leaves repo-owned files untouched", () => {
     assert.equal(read(repo, "README.md"), "# My own README\n");
-    assert.match(read(repo, ".ai-rulez/skills/hello/SKILL.md"), /A real skill/);
     assert.ok(existsSync(join(repo, ".ai-rulez/skills/real/SKILL.md")));
+    assert.ok(existsSync(join(gone, ".ai-rulez/skills/real/SKILL.md")));
     assert.equal(read(repo, "CHANGELOG.md"), "# Changelog\n\n## 0.3.0\n");
     assert.deepEqual(readJson(repo, ".release-please-manifest.json"), { ".": "0.3.0" });
     assert.equal(readJson(repo, "package.json").version, "0.3.0");
+  });
+
+  test("does not bring back a placeholder skill the repo deleted", () => {
+    assert.ok(!existsSync(join(gone, ".ai-rulez/skills/hello")));
+  });
+
+  test("merges a template change to the placeholder beside a local addition", () => {
+    const skill = read(repo, ".ai-rulez/skills/hello/SKILL.md");
+    assert.match(skill, /Template placeholder/);
+    assert.match(skill, /Local addition\./);
+    assert.ok(!/<<<<<<<|>>>>>>>/.test(skill), "no conflict markers");
   });
 
   test("merges template changes into template-owned files and keeps local edits", () => {
