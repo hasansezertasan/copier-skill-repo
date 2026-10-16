@@ -1,0 +1,74 @@
+# Installation
+
+{{ display_name }} publishes the same skills to four runtimes: Claude Code, Codex, OpenCode and Pi. Pick your runtime below. The skills are generated into `skills/` and the plugin manifests at the repository root.
+
+| Runtime | Route |
+| --- | --- |
+| [Claude Code](#claude-code) | Plugin marketplace |
+| [Codex](#codex) | Local plugin marketplace from a clone |
+| [OpenCode](#opencode) | Git only: point OpenCode at the skills |
+| [Pi](#pi) | Pi package from {{ 'npm or git' if publish_to_npm else 'git' }} |
+
+## Claude Code
+
+```sh
+claude plugin marketplace add {{ github_owner }}/{{ repo_name }}
+claude plugin install {{ repo_name }}@{{ repo_name }}
+```
+
+Inside a session the same steps are `/plugin marketplace add {{ github_owner }}/{{ repo_name }}` and `/plugin install {{ repo_name }}@{{ repo_name }}`. Update with `claude plugin marketplace update {{ repo_name }}`, then `claude plugin update {{ repo_name }}@{{ repo_name }}`. Run `/reload-plugins` or start a new session to load the skills.
+
+## Codex
+
+Clone the repository, then register the clone as a local marketplace:
+
+```sh
+git clone {{ repo_url }}
+codex plugin marketplace add /absolute/path/to/{{ repo_name }}
+codex plugin add {{ repo_name }}@{{ repo_name }}
+```
+
+Start a new thread to load the skills. To update, pull the clone and run `codex plugin add {{ repo_name }}@{{ repo_name }}` again.
+
+## OpenCode
+
+OpenCode installs from git only. Clone the repository, then make each skill discoverable. OpenCode searches `.agents/skills/<name>/SKILL.md` in the project and `~/.agents/skills/<name>/SKILL.md` globally, so link every folder under `skills/` into one of those:
+
+```sh
+git clone {{ repo_url }}
+mkdir -p ~/.agents/skills
+for skill in {{ repo_name }}/skills/*/; do ln -s "$PWD/${skill%/}" ~/.agents/skills/; done
+```
+
+Alternatively, add the clone's `skills/` directory to OpenCode's configuration:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": ["/absolute/path/to/{{ repo_name }}/skills"]
+  }
+}
+```
+
+To update, run `git pull` in the clone; nothing was copied.
+
+> **Open question.** The official OpenCode documentation shows no way for an npm package to ship skills, so there is no npm route for OpenCode. If that changes, add it here.
+
+## Pi
+
+{% if publish_to_npm -%}
+```sh
+pi install npm:{{ repo_name }}
+# or from git
+pi install git:github.com/{{ github_owner }}/{{ repo_name }}
+```
+{%- else -%}
+This package is not published to npm, so install it from git:
+
+```sh
+pi install git:github.com/{{ github_owner }}/{{ repo_name }}
+```
+{%- endif %}
+
+The package declares the `pi-package` keyword and a `pi.skills` entry pointing at `./skills` in `package.json`. Restart Pi or reload resources after installing or updating.

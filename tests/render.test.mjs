@@ -658,6 +658,64 @@ describe("copier update", () => {
   });
 });
 
+describe("four runtimes", () => {
+  const read = (repo, path) => readFileSync(join(repo, path), "utf8");
+
+  describe("by default", () => {
+    let repo;
+    before(() => {
+      repo = render({ repo_name: "demo-skills", description: "Demo.", github_owner: "acme", keywords: "alpha, beta" });
+    });
+
+    test("generates and verifies the Claude Code and Codex manifests", () => {
+      for (const path of [
+        ".claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json",
+        ".codex-plugin/plugin.json",
+        ".agents/plugins/marketplace.json",
+      ]) {
+        assert.equal(readJson(repo, path).name ?? readJson(repo, path).interface?.displayName, "demo-skills", path);
+      }
+      installAndCheck(repo);
+    });
+
+    test("carries the Pi keyword and skills entry in package.json", () => {
+      const pkg = readJson(repo, "package.json");
+      assert.deepEqual(pkg.keywords, ["alpha", "beta", "pi-package"]);
+      assert.deepEqual(pkg.pi, { skills: ["./skills"] });
+      assert.ok(existsSync(join(repo, "skills/hello/SKILL.md")), "the Pi skills path exists");
+    });
+
+    test("documents all four runtimes and the open OpenCode question", () => {
+      const doc = read(repo, "docs/installation.md");
+      assert.match(doc, /claude plugin marketplace add acme\/demo-skills/);
+      assert.match(doc, /codex plugin marketplace add/);
+      assert.match(doc, /\.agents\/skills\//);
+      assert.match(doc, /pi install npm:demo-skills/);
+      assert.match(doc, /pi install git:github\.com\/acme\/demo-skills/);
+      assert.match(doc, /Open question/);
+      assert.ok(!doc.includes("{{") && !doc.includes("{%"), "no unrendered template syntax");
+    });
+
+    test("ships a README skeleton that points at the install doc", () => {
+      const readme = read(repo, "README.md");
+      assert.match(readme, /^# Demo Skills$/m);
+      assert.match(readme, /docs\/installation\.md/);
+    });
+  });
+
+  test("keeps the Pi keyword once when the answer already has it", () => {
+    const repo = render({ repo_name: "demo-skills", description: "Demo.", keywords: "pi-package, alpha" });
+    assert.deepEqual(readJson(repo, "package.json").keywords, ["pi-package", "alpha"]);
+  });
+
+  test("offers Pi from git only when not publishing to npm", () => {
+    const doc = read(render({ repo_name: "demo-skills", description: "Demo.", publish_to_npm: false }), "docs/installation.md");
+    assert.doesNotMatch(doc, /pi install npm:/);
+    assert.match(doc, /pi install git:/);
+  });
+});
+
 describe("invalid answers", () => {
   for (const question of ["description", "author_name", "author_url"]) {
     for (const [label, value] of [["empty", ""], ["whitespace-only", "   "]]) {
