@@ -13,6 +13,13 @@ const templateRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workDirs = [];
 const FIVE_MINUTES = 5 * 60 * 1000;
 
+// Environment for every subprocess that touches a scratch repository. Git's
+// repository-location variables (GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, ...)
+// are inherited when the tests run from a Git hook, and would point `git reset
+// --hard`, `git clean` and `git commit` at the invoking repository instead of
+// the scratch directory.
+const scratchEnv = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+
 function scratchDir() {
   const dir = mkdtempSync(join(tmpdir(), "copier-skills-"));
   workDirs.push(dir);
@@ -33,6 +40,7 @@ function render(data, destName, extraArgs = []) {
   const dataFile = join(scratchDir(), "answers.json");
   writeFileSync(dataFile, JSON.stringify(data));
   execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", ...extraArgs, "--data-file", dataFile, source, dest], {
+    env: scratchEnv(),
     stdio: extraArgs.length ? ["ignore", "ignore", "pipe"] : "inherit",
     timeout: FIVE_MINUTES,
   });
@@ -581,7 +589,7 @@ describe("release safeguards", () => {
     // The push job's own shell, run for real in a scratch git repo with the
     // final `git push` stubbed out.
     const git = (cwd, ...args) =>
-      execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { cwd, stdio: "pipe" });
+      execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { cwd, env: scratchEnv(), stdio: "pipe" });
     const pushScript = () => {
       const release = readFileSync(join(repo, ".github/workflows/release.yml"), "utf8");
       // `\n  push:\n    needs` is the job; a bare `push:` also starts the `on:` trigger.
@@ -614,7 +622,7 @@ describe("release safeguards", () => {
         execFileSync("bash", ["-ec", pushScript()], {
           cwd: dir,
           stdio: "pipe",
-          env: { ...process.env, RUNNER_TEMP: dirname(patchPath), BRANCH: "release-please--branches--main" },
+          env: { ...scratchEnv(), RUNNER_TEMP: dirname(patchPath), BRANCH: "release-please--branches--main" },
         });
         return { ok: true, committed: git(dir, "rev-parse", "HEAD").toString() !== before, stderr: "" };
       } catch (error) {
@@ -775,6 +783,7 @@ describe("copier update", () => {
   const git = (cwd, ...args) =>
     execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", ...args], {
       cwd,
+      env: scratchEnv(),
       stdio: "pipe",
     });
   const read = (dir, path) => readFileSync(join(dir, path), "utf8");
@@ -802,6 +811,7 @@ describe("copier update", () => {
     const copier = (args, cwd) =>
       execFileSync("copier", [...args, "--defaults", "--trust", "--skip-tasks"], {
         cwd,
+        env: scratchEnv(),
         stdio: "pipe",
         timeout: FIVE_MINUTES,
       });
