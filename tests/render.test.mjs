@@ -691,6 +691,9 @@ describe("four runtimes", () => {
       assert.match(doc, /claude plugin marketplace add acme\/demo-skills/);
       assert.match(doc, /codex plugin marketplace add/);
       assert.match(doc, /\.agents\/skills\//);
+      // OpenCode deprecates the object form `skills: { paths: [...] }`.
+      assert.match(doc, /"skills": \["\/absolute\/path\/to\/demo-skills\/skills"\]/);
+      assert.doesNotMatch(doc, /"paths"/);
       assert.match(doc, /pi install npm:demo-skills/);
       assert.match(doc, /pi install git:github\.com\/acme\/demo-skills/);
       assert.match(doc, /Open question/);
