@@ -2,9 +2,15 @@ _min_copier_version: "9.4.0"
 _subdirectory: template
 _answers_file: .copier-answers.yml
 
-# The manifest holds the released version and release-please owns it, so
-# adopting an existing repo must not reset it to the template's 0.0.0.
+# Repo-owned files: a skill repo edits them freely after generation, so
+# `copier update` must never overwrite them. The release-please manifest holds
+# the released version, which release-please owns and adopting must not reset to
+# the template's 0.0.0. Every other scaffold file is template-owned and
+# three-way merged; the `version` in package.json merges as a local edit.
 _skip_if_exists:
+  - .ai-rulez/skills/**
+  - README.md
+  - CHANGELOG.md
   - .release-please-manifest.json
 
 # Generated output (skills/, plugin manifests, marketplace catalogs) is never
