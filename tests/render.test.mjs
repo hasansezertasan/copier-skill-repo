@@ -533,6 +533,127 @@ describe("contributing doc", () => {
   });
 });
 
+describe("renovate", () => {
+  test("extends the shared preset with no custom manager", () => {
+    const repo = render({ repo_name: "demo-skills", description: "Demo." });
+    const config = readJson(repo, ".github/renovate.json");
+    assert.deepEqual(config.extends, ["local>hasansezertasan/renovate-config"]);
+    assert.equal(config.customManagers, undefined);
+  });
+});
+
+describe("copier update", () => {
+  const git = (cwd, ...args) =>
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", ...args], {
+      cwd,
+      stdio: "pipe",
+    });
+  const read = (dir, path) => readFileSync(join(dir, path), "utf8");
+  const edit = (dir, path, from, to) => {
+    const before = read(dir, path);
+    assert.ok(before.includes(from), `${path} lacks ${JSON.stringify(from)}`);
+    writeFileSync(join(dir, path), before.replace(from, to));
+  };
+  let repo;
+  let gone;
+
+  before(() => {
+    // The earlier template state: a git repo of the working tree, tagged.
+    const source = scratchDir();
+    cpSync(join(templateRoot, "copier.yml"), join(source, "copier.yml"));
+    cpSync(join(templateRoot, "template"), join(source, "template"), { recursive: true });
+    git(source, "init", "-q", "-b", "main");
+    git(source, "add", "-A");
+    git(source, "commit", "-q", "-m", "earlier state");
+    git(source, "tag", "v1.0.0");
+
+    repo = join(scratchDir(), "demo-skills");
+    const dataFile = join(scratchDir(), "answers.json");
+    writeFileSync(dataFile, JSON.stringify({ repo_name: "demo-skills", description: "Demo." }));
+    const copier = (args, cwd) =>
+      execFileSync("copier", [...args, "--defaults", "--trust", "--skip-tasks"], {
+        cwd,
+        stdio: "pipe",
+        timeout: FIVE_MINUTES,
+      });
+    gone = join(scratchDir(), "demo-skills");
+    for (const dest of [repo, gone]) {
+      copier(["copy", "--vcs-ref", "v1.0.0", "--data-file", dataFile, source, dest]);
+      git(dest, "init", "-q", "-b", "main");
+      git(dest, "add", "-A");
+      git(dest, "commit", "-q", "-m", "chore: generate");
+    }
+
+    // A second repo replaced the placeholder with its own skill and deleted it.
+    rmSync(join(gone, ".ai-rulez/skills/hello"), { recursive: true });
+    mkdirSync(join(gone, ".ai-rulez/skills/real"), { recursive: true });
+    writeFileSync(join(gone, ".ai-rulez/skills/real/SKILL.md"), "---\nname: real\ndescription: Real.\n---\n");
+    git(gone, "add", "-A");
+    git(gone, "commit", "-q", "-m", "chore: replace placeholder");
+
+    // Local edits: repo-owned files, and a local edit inside template-owned ones.
+    writeFileSync(join(repo, "README.md"), "# My own README\n");
+    writeFileSync(join(repo, ".ai-rulez/skills/hello/SKILL.md"), `${read(repo, ".ai-rulez/skills/hello/SKILL.md")}\nLocal addition.\n`);
+    mkdirSync(join(repo, ".ai-rulez/skills/real"), { recursive: true });
+    writeFileSync(join(repo, ".ai-rulez/skills/real/SKILL.md"), "---\nname: real\ndescription: Real.\n---\n");
+    writeFileSync(join(repo, "CHANGELOG.md"), "# Changelog\n\n## 0.3.0\n");
+    writeFileSync(join(repo, ".release-please-manifest.json"), '{ ".": "0.3.0" }\n');
+    edit(repo, "package.json", '"version": "0.0.0"', '"version": "0.3.0"');
+    edit(repo, "CONTRIBUTING.md", "- Node comes from `.node-version`.", "- Node comes from `.node-version`.\n- Local rule: ask before merging.");
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "chore: local edits");
+
+    // The template moves on: it changes template-owned and repo-owned files alike.
+    edit(source, "template/CONTRIBUTING.md.jinja", "## Commits and pull requests", "## Commits and pull requests\n\n> Template note.");
+    edit(source, "template/package.json.jinja", '"node": ">=20"', '"node": ">=22"');
+    edit(source, "template/.ai-rulez/skills/{{ placeholder_skill }}/SKILL.md.jinja", "Placeholder skill", "Template placeholder");
+    edit(source, "template/.release-please-manifest.json", '"0.0.0"', '"0.0.1"');
+    git(source, "add", "-A");
+    git(source, "commit", "-q", "-m", "later state");
+    git(source, "tag", "v1.1.0");
+
+    for (const dest of [repo, gone]) {
+      try {
+        copier(["update", "--vcs-ref", "v1.1.0"], dest);
+      } catch (error) {
+        throw new Error(`copier update failed: ${error.stderr}${error.stdout}`);
+      }
+    }
+  });
+
+  test("leaves repo-owned files untouched", () => {
+    assert.equal(read(repo, "README.md"), "# My own README\n");
+    assert.ok(existsSync(join(repo, ".ai-rulez/skills/real/SKILL.md")));
+    assert.ok(existsSync(join(gone, ".ai-rulez/skills/real/SKILL.md")));
+    assert.equal(read(repo, "CHANGELOG.md"), "# Changelog\n\n## 0.3.0\n");
+    assert.deepEqual(readJson(repo, ".release-please-manifest.json"), { ".": "0.3.0" });
+    assert.equal(readJson(repo, "package.json").version, "0.3.0");
+  });
+
+  test("does not bring back a placeholder skill the repo deleted", () => {
+    assert.ok(!existsSync(join(gone, ".ai-rulez/skills/hello")));
+  });
+
+  test("merges a template change to the placeholder beside a local addition", () => {
+    const skill = read(repo, ".ai-rulez/skills/hello/SKILL.md");
+    assert.match(skill, /Template placeholder/);
+    assert.match(skill, /Local addition\./);
+    assert.ok(!/<<<<<<<|>>>>>>>/.test(skill), "no conflict markers");
+  });
+
+  test("merges template changes into template-owned files and keeps local edits", () => {
+    const contributing = read(repo, "CONTRIBUTING.md");
+    assert.match(contributing, /Template note\./);
+    assert.match(contributing, /Local rule: ask before merging\./);
+    assert.equal(readJson(repo, "package.json").engines.node, ">=22");
+    assert.ok(!/<<<<<<<|>>>>>>>/.test(contributing), "no conflict markers");
+  });
+
+  test("moves the answers file to the new template version", () => {
+    assert.match(read(repo, ".copier-answers.yml"), /_commit: v1\.1\.0/);
+  });
+});
+
 describe("invalid answers", () => {
   for (const question of ["description", "author_name", "author_url"]) {
     for (const [label, value] of [["empty", ""], ["whitespace-only", "   "]]) {
