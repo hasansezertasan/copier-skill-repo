@@ -384,6 +384,10 @@ describe("release", () => {
       assert.ok(!existsSync(join(repo, "CHANGELOG.md")), "release-please creates the changelog itself");
       const config = readJson(repo, "release-please-config.json").packages["."];
       assert.equal(config["release-type"], "node");
+      // The default grouped title omits the version, so release-please cannot
+      // recognise the merged release PR and silently creates no tag
+      // (googleapis/release-please#2712).
+      assert.match(readJson(repo, "release-please-config.json")["group-pull-request-title-pattern"], /\$\{version\}/);
       assert.deepEqual(config["extra-files"].map((file) => file.path).sort(), [
         ".claude-plugin/marketplace.json",
         ".claude-plugin/plugin.json",
