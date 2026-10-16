@@ -512,6 +512,8 @@ describe("contributing doc", () => {
     assert.match(doc, /create and approve pull requests/);
     assert.match(doc, /`check` status check/);
     assert.match(doc, /close and reopen/i);
+    assert.match(doc, /after each update/);
+    assert.match(doc, /Publish the `0\.0\.0` placeholder once by hand/);
     assert.match(doc, /trusted publisher: .*owner `acme`, repository `demo-skills`, workflow `release\.yml`/);
     assert.match(doc, /references\//);
     assert.match(doc, /evals\//);
