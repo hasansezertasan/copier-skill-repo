@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/hasansezertasan/copier-skills/compare/v0.1.0...v0.1.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* regenerate the plugin output on the release PR branch ([#31](https://github.com/hasansezertasan/copier-skills/issues/31)) ([cbd5a39](https://github.com/hasansezertasan/copier-skills/commit/cbd5a39332a021f08abe6562ecce904172a48ff8))
+* restore the copied-skills check and Codex update caveat ([#32](https://github.com/hasansezertasan/copier-skills/issues/32)) ([0cb53ec](https://github.com/hasansezertasan/copier-skills/commit/0cb53ec8ac3b0a338df4ee3f40947cc2f42b30bb))
+
 ## 0.1.0 (2026-10-16)
 
 
