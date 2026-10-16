@@ -90,7 +90,7 @@ describe("rendered with default answers", () => {
 
   test("uses package.json as the version source", () => {
     const pkg = readJson(repo, "package.json");
-    assert.equal(pkg.version, "0.1.0");
+    assert.equal(pkg.version, "0.0.0");
     assert.equal(readJson(repo, ".claude-plugin/plugin.json").version, pkg.version);
     assert.match(pkg.devDependencies["ai-rulez"], /^5\.\d+\.\d+$/);
     assert.ok(pkg.scripts.check && pkg.scripts.generate);
@@ -380,7 +380,7 @@ describe("release", () => {
     });
 
     test("lets release-please own the version, changelog and manifest", () => {
-      assert.deepEqual(readJson(repo, ".release-please-manifest.json"), { ".": "0.1.0" });
+      assert.deepEqual(readJson(repo, ".release-please-manifest.json"), { ".": "0.0.0" });
       assert.ok(!existsSync(join(repo, "CHANGELOG.md")), "release-please creates the changelog itself");
       const config = readJson(repo, "release-please-config.json").packages["."];
       assert.equal(config["release-type"], "node");
@@ -410,7 +410,7 @@ describe("release", () => {
     test("stops the release when a plugin manifest drifts from package.json", () => {
       const path = join(repo, ".codex-plugin/plugin.json");
       const original = readFileSync(path, "utf8");
-      writeFileSync(path, original.replace('"version": "0.1.0"', '"version": "9.9.9"'));
+      writeFileSync(path, original.replace('"version": "0.0.0"', '"version": "9.9.9"'));
       try {
         assert.throws(() => runIn(repo, "release-guard.mjs", "--publish"), guardFailsWith(/\.codex-plugin\/plugin\.json: version "9\.9\.9"/));
       } finally {
