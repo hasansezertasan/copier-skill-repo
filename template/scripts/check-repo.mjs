@@ -49,7 +49,7 @@ const scopedPermissions = (value, children) => {
 };
 
 // Workflows and local composite actions both reference third-party actions.
-const USES = /(?:^\s*(?:-\s+)*|[{,]\s*)["']?uses["']?:\s*["']?([^\s"',}]*)/g;
+const USES = /(?:^\s*(?:-\s+)*|[{,]\s*)["']?uses["']?\s*:\s*["']?([^\s"',}]*)/g;
 for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
   const lines = readYaml(path);
   lines.forEach((line, index) => {
@@ -73,26 +73,27 @@ for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
 for (const path of workflows) {
   const lines = readYaml(path);
 
-  if (!lines.includes("permissions: {}")) {
+  if (!lines.some((line) => /^permissions\s*:\s*\{\}$/.test(line))) {
     problems.push(`${path}: top-level \`permissions: {}\` is required`);
   }
 
   // Every job declares its own permissions block.
-  const start = lines.indexOf("jobs:");
+  const start = lines.findIndex((line) => /^jobs\s*:$/.test(line));
+  if (start < 0) problems.push(`${path}: no \`jobs:\` mapping found`);
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((line) => /^\S/.test(line));
   const jobsBlock = start < 0 ? [] : end < 0 ? rest : rest.slice(0, end);
-  const jobIds = jobsBlock.flatMap((line, i) => (/^ {2}["']?[\w-]+["']?:$/.test(line) ? [i] : []));
+  const jobIds = jobsBlock.flatMap((line, i) => (/^ {2}["']?[\w-]+["']?\s*:$/.test(line) ? [i] : []));
   jobIds.forEach((from, n) => {
     const body = jobsBlock.slice(from + 1, jobIds[n + 1] ?? jobsBlock.length);
     // A job that calls a reusable workflow still scopes what it hands down.
-    const job = jobsBlock[from].trim().slice(0, -1).replace(/^["']|["']$/g, "");
-    const at = body.findIndex((line) => /^ {4}permissions:/.test(line));
+    const job = jobsBlock[from].trim().replace(/\s*:$/, "").replace(/^["']|["']$/g, "");
+    const at = body.findIndex((line) => /^ {4}permissions\s*:/.test(line));
     if (at < 0) {
       problems.push(`${path}: job \`${job}\` has no permissions block`);
       return;
     }
-    const value = body[at].replace(/^ {4}permissions:\s*/, "");
+    const value = body[at].replace(/^ {4}permissions\s*:\s*/, "");
     const after = body.slice(at + 1);
     const next = after.findIndex((line) => /^ {0,4}\S/.test(line));
     const children = (next < 0 ? after : after.slice(0, next)).filter((line) => line.trim() !== "");

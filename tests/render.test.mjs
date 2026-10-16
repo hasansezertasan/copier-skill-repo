@@ -226,6 +226,21 @@ describe("hardened CI", () => {
     );
   });
 
+  test("the repository check rejects an unpinned action when the uses key has a space before the colon", () => {
+    checkMutation((text) => text.replace(checkoutRef, "uses : actions/checkout@v4"), /not pinned by commit SHA/);
+  });
+
+  test("the repository check still validates jobs when the jobs key has a space before the colon", () => {
+    checkMutation(
+      (text) => text.replace(/^jobs:\n/m, "jobs :\n  extra:\n    runs-on: ubuntu-latest\n    steps: []\n"),
+      /job `extra` has no permissions block/,
+    );
+  });
+
+  test("the repository check fails closed when no jobs mapping is found", () => {
+    checkMutation((text) => text.replace(/^jobs:\n/m, "tasks:\n"), /no `jobs:` mapping found/);
+  });
+
   test("the repository check ignores a commented-out action reference", () => {
     checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });
