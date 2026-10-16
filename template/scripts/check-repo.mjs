@@ -15,11 +15,25 @@ const workflows = yamlFiles(".github/workflows");
 if (workflows.length === 0) problems.push(".github/workflows: no workflows found");
 
 const readLines = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n").split("\n");
+// Drops full-line and trailing comments, so a commented-out line never counts.
+const stripComment = (line) => line.replace(/^\s*#.*$|\s+#.*$/, "").trimEnd();
+
+// A job's `permissions:` must be `{}` or scopes set to read, write or none:
+// no scalar such as `write-all`, no expression, no empty block.
+const SCOPE = /^[\w-]+:\s*(read|write|none)$/;
+const scopedPermissions = (value, children) => {
+  if (value === "{}") return true;
+  if (value.startsWith("{") && value.endsWith("}")) {
+    const pairs = value.slice(1, -1).split(",").map((pair) => pair.trim());
+    return pairs.every((pair) => SCOPE.test(pair));
+  }
+  return value === "" && children.length > 0 && children.every((line) => /^ {6}/.test(line) && SCOPE.test(line.trim()));
+};
 
 // Workflows and local composite actions both reference third-party actions.
 for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
   readLines(path).forEach((line, index) => {
-    const code = line.replace(/\s#.*$/, "");
+    const code = stripComment(line);
     for (const [, ref] of code.matchAll(/\buses:\s*["']?([^\s"',}]+)/g)) {
       // Local actions have no SHA to pin.
       if (ref.startsWith("./")) continue;
@@ -31,7 +45,7 @@ for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
 }
 
 for (const path of workflows) {
-  const lines = readLines(path).map((line) => line.replace(/\s+#.*$/, "").trimEnd());
+  const lines = readLines(path).map(stripComment);
 
   if (!lines.includes("permissions: {}")) {
     problems.push(`${path}: top-level \`permissions: {}\` is required`);
@@ -46,8 +60,18 @@ for (const path of workflows) {
   jobIds.forEach((from, n) => {
     const body = jobsBlock.slice(from + 1, jobIds[n + 1] ?? jobsBlock.length);
     // A job that calls a reusable workflow still scopes what it hands down.
-    if (!body.some((line) => /^ {4}permissions:/.test(line))) {
-      problems.push(`${path}: job \`${jobsBlock[from].trim().slice(0, -1)}\` has no permissions block`);
+    const job = jobsBlock[from].trim().slice(0, -1);
+    const at = body.findIndex((line) => /^ {4}permissions:/.test(line));
+    if (at < 0) {
+      problems.push(`${path}: job \`${job}\` has no permissions block`);
+      return;
+    }
+    const value = body[at].replace(/^ {4}permissions:\s*/, "");
+    const after = body.slice(at + 1);
+    const next = after.findIndex((line) => /^ {0,4}\S/.test(line));
+    const children = (next < 0 ? after : after.slice(0, next)).filter((line) => line.trim() !== "");
+    if (!scopedPermissions(value, children)) {
+      problems.push(`${path}: job \`${job}\` has unscoped permissions; use \`{}\` or scopes set to read, write or none`);
     }
   });
 }

@@ -164,28 +164,81 @@ describe("hardened CI", () => {
     runCheck();
   });
 
-  test("the repository check rejects an unpinned action", () => {
+  // Applies `transform` to the rendered workflow, expects the repository check
+  // to fail with `pattern`, and restores the file. Passing `pattern: null`
+  // expects the mutated workflow to still pass.
+  const checkMutation = (transform, pattern) => {
     const file = join(repo, ".github/workflows/check.yml");
     const original = workflow();
-    writeFileSync(file, original.replace(/@[0-9a-f]{40}/, "@v4"));
+    const mutated = transform(original);
+    assert.notEqual(mutated, original, "the mutation did not change the workflow");
+    writeFileSync(file, mutated);
     try {
-      assert.throws(runRepoCheck, stderrMatches(/not pinned by commit SHA/));
+      if (pattern) assert.throws(runRepoCheck, stderrMatches(pattern));
+      else runRepoCheck();
     } finally {
       writeFileSync(file, original);
     }
     runRepoCheck();
+  };
+  const jobPermissions = /^ {4}permissions:\n {6}contents: read$/m;
+  const withJobPermissions = (replacement) => (text) => text.replace(jobPermissions, replacement);
+  // A job inserted at the top of `jobs:`, optionally behind a column-zero comment.
+  const withExtraJob = (lead, permissions = "") => (text) =>
+    text.replace(/^jobs:\n/m, `jobs:\n${lead}  extra:\n    runs-on: ubuntu-latest\n${permissions}    steps: []\n`);
+
+  test("the repository check rejects an unpinned action", () => {
+    checkMutation((text) => text.replace(/@[0-9a-f]{40}/, "@v4"), /not pinned by commit SHA/);
+  });
+
+  test("the repository check ignores a commented-out action reference", () => {
+    checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });
 
   test("the repository check rejects missing top-level permissions", () => {
-    const file = join(repo, ".github/workflows/check.yml");
-    const original = workflow();
-    writeFileSync(file, original.replace(/^permissions: \{\}\n/m, ""));
-    try {
-      assert.throws(runRepoCheck, stderrMatches(/top-level `permissions: \{\}` is required/));
-    } finally {
-      writeFileSync(file, original);
-    }
-    runRepoCheck();
+    checkMutation((text) => text.replace(/^permissions: \{\}\n/m, ""), /top-level `permissions: \{\}` is required/);
+  });
+
+  for (const [label, value] of [
+    ["write-all", "write-all"],
+    ["quoted write-all", '"write-all"'],
+    ["read-all", "read-all"],
+    ["an expression", "${{ inputs.permissions }}"],
+    ["an inline scalar with a trailing comment", "write-all # why not"],
+  ]) {
+    test(`the repository check rejects a job with permissions ${label}`, () => {
+      checkMutation(withJobPermissions(`    permissions: ${value}`), /unscoped permissions/);
+    });
+  }
+
+  test("the repository check rejects a job with an empty permissions block", () => {
+    checkMutation(withJobPermissions("    permissions:"), /unscoped permissions/);
+  });
+
+  test("the repository check rejects a permission level that is not read, write or none", () => {
+    checkMutation(withJobPermissions("    permissions:\n      contents: admin"), /unscoped permissions/);
+  });
+
+  for (const [label, replacement] of [
+    ["an empty mapping", "    permissions: {}"],
+    ["an inline mapping", "    permissions: { contents: write, pull-requests: read }"],
+    ["a block of several scopes", "    permissions:\n      contents: read\n      id-token: write # publish"],
+  ]) {
+    test(`the repository check accepts a job with permissions as ${label}`, () => {
+      checkMutation(withJobPermissions(replacement), null);
+    });
+  }
+
+  test("the repository check finds a job without permissions after a column-zero comment", () => {
+    checkMutation(withExtraJob("# a comment at column zero\n"), /job `extra` has no permissions block/);
+  });
+
+  test("the repository check stops scanning jobs at the next top-level key", () => {
+    checkMutation((text) => `${text.trimEnd()}\nenv:\n  not-a-job:\n`, null);
+  });
+
+  test("the repository check reports write-all on a job added behind a comment", () => {
+    checkMutation(withExtraJob("# note\n", "    permissions: write-all\n"), /job `extra` has unscoped permissions/);
   });
 
   test("the repository check has no dependencies", () => {
