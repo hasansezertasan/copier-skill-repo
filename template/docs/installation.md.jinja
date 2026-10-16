@@ -27,14 +27,14 @@ You were pointed here to install the skills. Do this:
 | Runtime | Install | Update | Confirm |
 | --- | --- | --- | --- |
 | Claude Code | `claude plugin marketplace add {{ github_owner }}/{{ repo_name }}`, then `claude plugin install {{ repo_name }}@{{ repo_name }}` (in a session: `/plugin marketplace add {{ github_owner }}/{{ repo_name }}` and `/plugin install {{ repo_name }}@{{ repo_name }}`) | `claude plugin marketplace update {{ repo_name }}`, then `claude plugin update {{ repo_name }}@{{ repo_name }}` | `claude plugin list` shows the plugin and its version; run `/reload-plugins` or start a new session to load it |
-| Codex | clone this repository, then `codex plugin marketplace add /absolute/path/to/{{ repo_name }}` and `codex plugin add {{ repo_name }}@{{ repo_name }}`; start a new thread | pull the clone, then `codex plugin add {{ repo_name }}@{{ repo_name }}` again, and start a new thread | the plugin appears in Codex's plugin list in a new thread |
+| Codex | clone this repository, then `codex plugin marketplace add /absolute/path/to/{{ repo_name }}` and `codex plugin add {{ repo_name }}@{{ repo_name }}`; start a new thread | pull the clone, then `codex plugin add {{ repo_name }}@{{ repo_name }}` again, and start a new thread (`marketplace upgrade` applies to Git marketplaces, not a local path; this update route has not been verified) | the plugin appears in Codex's plugin list in a new thread |
 | OpenCode | git only; see [OpenCode](#opencode) | `git pull` in the clone | the skills are offered by OpenCode's `skill` tool in a new session |
 {%- if publish_to_npm %}
 | Pi | `pi install npm:{{ repo_name }}` or `pi install git:github.com/{{ github_owner }}/{{ repo_name }}` | `pi update npm:{{ repo_name }}` or `pi update git:github.com/{{ github_owner }}/{{ repo_name }}` (the source you installed from; a bare `pi update` updates Pi itself), then restart Pi or reload resources | invoke one of the skills with `/skill:<name>` |
 {%- else %}
 | Pi | `pi install git:github.com/{{ github_owner }}/{{ repo_name }}` (not published to npm) | `pi update git:github.com/{{ github_owner }}/{{ repo_name }}` (a bare `pi update` updates Pi itself), then restart Pi or reload resources | invoke one of the skills with `/skill:<name>` |
 {%- endif %}
-| Manual | clone this repository and read `skills/<name>/SKILL.md`, or copy `skills/*` into your agent's skills directory | `git pull` in the clone, then copy `skills/*` again if you copied them | the clone's `git rev-parse HEAD` matches the latest commit on `main` |
+| Manual | clone this repository and read `skills/<name>/SKILL.md`, or copy `skills/*` into your agent's skills directory | `git pull` in the clone, then copy `skills/*` again if you copied them | the clone's `git rev-parse HEAD` matches the latest commit on `main`; if you copied the skills, `for d in <clone>/skills/*/; do diff -r "$d" "<destination>/$(basename "$d")"; done` prints nothing (compare skill by skill: the destination may hold skills from other sources) |
 
 The Pi package declares the `pi-package` keyword and a `pi.skills` entry pointing at `./skills` in `package.json`. To compare an installed version with the latest, use the version in `.claude-plugin/plugin.json` or the repository's latest GitHub release.
 
