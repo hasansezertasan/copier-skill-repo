@@ -527,8 +527,10 @@ describe("release safeguards", () => {
     assert.match(release, /node scripts\/release-merge\.mjs/);
     assert.match(release, /skip-github-release: \$\{\{ steps\.release-merge\.outputs\.is-release-merge != 'true' \}\}/);
     const check = readFileSync(join(repo, ".github/workflows/check.yml"), "utf8");
-    assert.match(check, /^  workflow_dispatch:\n    inputs:\n      ref:/m);
-    assert.match(check, /ref: \$\{\{ inputs\.ref \|\| github\.sha \}\}/);
+    // No `ref` input: it would let a run report on a commit other than the one
+    // the check is bound to, so the check could pass a head it never validated.
+    assert.match(check, /^  workflow_dispatch:$/m);
+    assert.doesNotMatch(check, /inputs/);
     assert.match(readFileSync(join(repo, "CONTRIBUTING.md"), "utf8"), /gh workflow run check\.yml --ref release-please--branches--main/);
   });
 
