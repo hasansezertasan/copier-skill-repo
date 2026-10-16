@@ -191,6 +191,41 @@ describe("hardened CI", () => {
     checkMutation((text) => text.replace(/@[0-9a-f]{40}/, "@v4"), /not pinned by commit SHA/);
   });
 
+  const checkoutRef = /uses: (actions\/checkout@[0-9a-f]{40})/;
+
+  test("the repository check rejects an unpinned action whose value is on the next line", () => {
+    checkMutation((text) => text.replace(checkoutRef, "uses:\n        actions/checkout@v4"), /not pinned by commit SHA/);
+  });
+
+  test("the repository check accepts a pinned action whose value is on the next line", () => {
+    checkMutation((text) => text.replace(checkoutRef, "uses:\n        $1"), null);
+  });
+
+  test("the repository check ignores uses: text inside a run block", () => {
+    checkMutation(
+      (text) => text.replace("- run: npm ci\n", "- run: |\n          npm ci\n          echo uses: actions/checkout@v4\n          - uses: actions/checkout@v4\n"),
+      null,
+    );
+  });
+
+  test("the repository check ignores uses: text inside a single-line run command", () => {
+    checkMutation((text) => text.replace("- run: npm ci\n", '- run: echo "uses: actions/checkout@v4"\n      - run: npm ci\n'), null);
+  });
+
+  test("the repository check still finds an unpinned action right after a run block", () => {
+    checkMutation(
+      (text) => text.replace("- run: npm ci\n", "- run: |\n          npm ci\n      - uses: actions/checkout@v4\n"),
+      /not pinned by commit SHA/,
+    );
+  });
+
+  test("the repository check finds a quoted job id without permissions", () => {
+    checkMutation(
+      (text) => text.replace(/^jobs:\n/m, 'jobs:\n  "extra":\n    runs-on: ubuntu-latest\n    steps: []\n'),
+      /job `extra` has no permissions block/,
+    );
+  });
+
   test("the repository check ignores a commented-out action reference", () => {
     checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });
