@@ -15,6 +15,9 @@
     "url": "{{ repo_url }}"
   },
   "keywords": {{ keywords_json | tojson }},
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "generate": "ai-rulez generate --no-self-mcp --strict-config && ai-rulez generate --plugin",
     "check": "node scripts/check-repo.mjs && ai-rulez generate --check --no-self-mcp --strict-config && ai-rulez verify --plugin && ai-rulez validate --strict"

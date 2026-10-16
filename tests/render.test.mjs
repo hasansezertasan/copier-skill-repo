@@ -4,7 +4,7 @@
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -118,279 +118,251 @@ describe("rendered with default answers", () => {
 
 describe("hardened CI", () => {
   let repo;
-  const workflow = () => readFileSync(join(repo, ".github/workflows/check.yml"), "utf8");
-  const runCheck = () => execFileSync("npm", ["run", "check"], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES });
+  const checkFile = ".github/workflows/check.yml";
+  const workflow = () => readFileSync(join(repo, checkFile), "utf8");
   const runRepoCheck = () =>
     execFileSync("node", ["scripts/check-repo.mjs"], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES });
-  const stderrMatches = (pattern) => (error) => pattern.test(String(error.stderr) + String(error.stdout));
+  // A clean failure: exit status 1, the expected message, and no crash. A thrown
+  // error would print the source line holding the message, so stack traces are
+  // rejected explicitly.
+  const failsWith = (pattern) => (error) =>
+    error.status === 1 && !/\n\s+at .*:\d+:\d+/.test(String(error.stderr)) && pattern.test(String(error.stderr));
   before(() => {
     repo = render({ repo_name: "demo-skills", description: "Demo." });
     execFileSync("npm", ["ci"], { cwd: repo, stdio: "inherit", timeout: FIVE_MINUTES });
   });
 
-  test("pins every action reference by commit SHA", () => {
-    const uses = [...workflow().matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)/gm)].map((m) => m[1]);
-    assert.ok(uses.length > 0);
-    for (const ref of uses) assert.match(ref, /^[\w.-]+\/[\w.-]+(\/[\w./-]+)?@[0-9a-f]{40}$/, ref);
-  });
-
-  test("denies permissions at the top level and scopes them per job", () => {
-    assert.match(workflow(), /^permissions: \{\}$/m);
-    assert.match(workflow(), /^ {4}permissions:\n {6}contents: read$/m);
-  });
-
-  test("runs unfiltered and is callable from another workflow", () => {
-    const text = workflow();
-    assert.match(text, /^ {2}workflow_call:/m);
-    assert.match(text, /^ {2}pull_request:/m);
-    assert.match(text, /^ {2}push:/m);
-    assert.doesNotMatch(text, /^\s*(paths|paths-ignore|branches|branches-ignore|tags):/m);
-  });
-
-  test("runs the repository's own check", () => {
-    assert.match(workflow(), /run: npm run check$/m);
-    assert.match(workflow(), /run: npm ci$/m);
-  });
-
-  test("fails when generated output is stale", () => {
-    const file = join(repo, "skills/hello/SKILL.md");
-    const original = readFileSync(file, "utf8");
-    writeFileSync(file, `${original}\nhand edit\n`);
-    try {
-      assert.throws(runCheck, stderrMatches(/drift|out of date|stale|differ|generate/i));
-    } finally {
-      writeFileSync(file, original);
+  // Runs the repository check against the rendered repo with `files` written
+  // into it (path -> content, `null` leaves the file alone), then restores it.
+  // `pattern: null` expects the check to pass.
+  const checkRepo = (files, pattern) => {
+    const originals = new Map();
+    for (const [path, content] of Object.entries(files)) {
+      const full = join(repo, path);
+      originals.set(full, existsSync(full) ? readFileSync(full, "utf8") : null);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, content);
     }
-    runCheck();
-  });
-
-  // Applies `transform` to the rendered workflow, expects the repository check
-  // to fail with `pattern`, and restores the file. Passing `pattern: null`
-  // expects the mutated workflow to still pass.
-  const checkMutation = (transform, pattern) => {
-    const file = join(repo, ".github/workflows/check.yml");
+    try {
+      if (pattern) assert.throws(runRepoCheck, failsWith(pattern));
+      else runRepoCheck();
+    } finally {
+      for (const [full, original] of originals) {
+        if (original === null) rmSync(full, { force: true });
+        else writeFileSync(full, original);
+      }
+    }
+  };
+  // Mutates the rendered check workflow; the mutation must change it.
+  const mutate = (transform, pattern) => {
     const original = workflow();
     const mutated = transform(original);
     assert.notEqual(mutated, original, "the mutation did not change the workflow");
-    writeFileSync(file, mutated);
-    try {
-      if (pattern) assert.throws(runRepoCheck, stderrMatches(pattern));
-      else runRepoCheck();
-    } finally {
-      writeFileSync(file, original);
-    }
-    runRepoCheck();
+    checkRepo({ [checkFile]: mutated }, pattern);
   };
+  const rejects = (label, transform, pattern) => test(`rejects ${label}`, () => mutate(transform, pattern));
+  const accepts = (label, transform) => test(`accepts ${label}`, () => mutate(transform, null));
+
+  const NOT_PINNED = /not pinned by commit SHA/;
+  const FLOW = /flow style is not supported/;
+  const UNSUPPORTED = /anchors, aliases and tags are not supported|unsupported line|unexpected sequence item|nested block/;
+  const UNSCOPED = /unscoped permissions/;
+  const SHA = "a".repeat(40);
+  const checkout = /- uses: actions\/checkout@[0-9a-f]{40}/;
   const jobPermissions = /^ {4}permissions:\n {6}contents: read$/m;
   const withJobPermissions = (replacement) => (text) => text.replace(jobPermissions, replacement);
-  // A job inserted at the top of `jobs:`, optionally behind a column-zero comment.
-  const withExtraJob = (lead, permissions = "") => (text) =>
-    text.replace(/^jobs:\n/m, `jobs:\n${lead}  extra:\n    runs-on: ubuntu-latest\n${permissions}    steps: []\n`);
+  const withStep = (step) => (text) => text.replace("      - run: npm ci\n", `      - run: npm ci\n${step}`);
+  const withJob = (job) => (text) => text.replace(/^jobs:\n/m, `jobs:\n${job}`);
+  const reusableJob = (ref) => withJob(`  extra:\n    permissions: {}\n    uses: ${ref}\n`);
 
-  test("the repository check rejects an unpinned action", () => {
-    checkMutation((text) => text.replace(/@[0-9a-f]{40}/, "@v4"), /not pinned by commit SHA/);
-  });
-
-  const checkoutRef = /uses: (actions\/checkout@[0-9a-f]{40})/;
-
-  test("the repository check rejects an unpinned action whose value is on the next line", () => {
-    checkMutation((text) => text.replace(checkoutRef, "uses:\n        actions/checkout@v4"), /not pinned by commit SHA/);
-  });
-
-  test("the repository check accepts a pinned action whose value is on the next line", () => {
-    checkMutation((text) => text.replace(checkoutRef, "uses:\n        $1"), null);
-  });
-
-  test("the repository check ignores uses: text inside a run block", () => {
-    checkMutation(
-      (text) => text.replace("- run: npm ci\n", "- run: |\n          npm ci\n          echo uses: actions/checkout@v4\n          - uses: actions/checkout@v4\n"),
-      null,
-    );
-  });
-
-  test("the repository check ignores uses: text inside a single-line run command", () => {
-    checkMutation((text) => text.replace("- run: npm ci\n", '- run: echo "uses: actions/checkout@v4"\n      - run: npm ci\n'), null);
-  });
-
-  test("the repository check still finds an unpinned action right after a run block", () => {
-    checkMutation(
-      (text) => text.replace("- run: npm ci\n", "- run: |\n          npm ci\n      - uses: actions/checkout@v4\n"),
-      /not pinned by commit SHA/,
-    );
-  });
-
-  test("the repository check finds a quoted job id without permissions", () => {
-    checkMutation(
-      (text) => text.replace(/^jobs:\n/m, 'jobs:\n  "extra":\n    runs-on: ubuntu-latest\n    steps: []\n'),
-      /job `extra` has no permissions block/,
-    );
-  });
-
-  test("the repository check rejects an unpinned action when the uses key has a space before the colon", () => {
-    checkMutation((text) => text.replace(checkoutRef, "uses : actions/checkout@v4"), /not pinned by commit SHA/);
-  });
-
-  test("the repository check still validates jobs when the jobs key has a space before the colon", () => {
-    checkMutation(
-      (text) => text.replace(/^jobs:\n/m, "jobs :\n  extra:\n    runs-on: ubuntu-latest\n    steps: []\n"),
-      /job `extra` has no permissions block/,
-    );
-  });
-
-  test("the repository check fails closed when no jobs mapping is found", () => {
-    checkMutation((text) => text.replace(/^jobs:\n/m, "tasks:\n"), /no `jobs:` mapping found/);
-  });
-
-  test("the repository check fails closed when job ids are not indented two spaces", () => {
-    checkMutation(
-      (text) => text.replace(/^jobs:\n/m, "jobs:\n    extra:\n        runs-on: ubuntu-latest\n        steps: []\n"),
-      /jobs are not indented two spaces/,
-    );
-  });
-
-  test("the repository check rejects flow style outside empty collections", () => {
-    for (const [label, transform] of [
-      ["an inline permissions mapping", withJobPermissions("    permissions: { contents: read }")],
-      ["a flow-mapping step", (text) => text.replace(checkoutRef, "uses: actions/checkout@v4").replace("- uses: actions/checkout@v4", "- { name: x, with: { a: b }, uses: actions/checkout@v4 }")],
-      ["a flow-sequence of steps", (text) => text.replace(/^jobs:\n/m, "jobs:\n  extra: { runs-on: ubuntu-latest, steps: [{ uses: actions/checkout@v4 }] }\n")],
-      ["a multi-line flow sequence", (text) => text.replace("- run: npm ci\n", "- run: npm ci\n        with: [\n          a\n        ]\n")],
-    ]) {
-      checkMutation(transform, /flow style is not supported; use block style/);
-    }
-  });
-
-  test("the repository check accepts empty flow collections, expressions and quoted brackets", () => {
-    checkMutation(
-      (text) => text.replace("- run: npm ci\n", '- run: echo "${{ github.sha }} [a] {b}"\n      - run: npm ci\n        env: {}\n'),
-      null,
-    );
-  });
-
-  test("the repository check ignores a uses key that is not a step key", () => {
-    checkMutation((text) => text.replace("- run: npm ci\n", "- run: npm ci\n        env:\n          uses: harmless\n"), null);
-  });
-
-  test("the repository check reads uses as a later key of a step", () => {
-    checkMutation(
-      (text) => text.replace(checkoutRef, "name: checkout\n        uses: actions/checkout@v4"),
-      /not pinned by commit SHA/,
-    );
-  });
-
-  test("the repository check accepts a local action reference", () => {
-    checkMutation((text) => text.replace(checkoutRef, "uses: ./.github/actions/setup"), null);
-  });
-
-  test("the repository check reads a step whose dash is on its own line", () => {
-    checkMutation(
-      (text) => text.replace(/- uses: actions\/checkout@[0-9a-f]{40}/, "-\n        uses: actions/checkout@v4"),
-      /not pinned by commit SHA/,
-    );
-  });
-
-  const reusableJob = (ref) => (text) =>
-    text.replace(/^jobs:\n/m, `jobs:\n  extra:\n    permissions: {}\n    uses: ${ref}\n`);
-
-  test("the repository check rejects an unpinned reusable workflow reference on a job", () => {
-    checkMutation(reusableJob("owner/repo/.github/workflows/build.yml@v1"), /not pinned by commit SHA/);
-  });
-
-  test("the repository check accepts a pinned or local reusable workflow reference on a job", () => {
-    checkMutation(reusableJob(`owner/repo/.github/workflows/build.yml@${"a".repeat(40)}`), null);
-    checkMutation(reusableJob("./.github/workflows/build.yml"), null);
-  });
-
-  test("the repository check rejects anchors, aliases and merge keys", () => {
-    for (const transform of [
-      (text) => text.replace(/^jobs:\n/m, "jobs:\n  extra: &anchor\n    runs-on: ubuntu-latest\n    steps: []\n"),
-      (text) => text.replace("- run: npm ci\n", "- run: npm ci\n        env: *shared\n"),
-      (text) => text.replace("    runs-on: ubuntu-latest\n", "    runs-on: ubuntu-latest\n    <<: *defaults\n"),
-    ]) {
-      checkMutation(transform, /anchors and aliases are not supported/);
-    }
-  });
-
-  test("the repository check ignores a uses key in a matrix entry", () => {
-    checkMutation(
-      (text) =>
-        text.replace(
-          "    steps:\n",
-          "    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n            uses: ordinary\n    steps:\n",
-        ),
-      null,
-    );
-  });
-
-  test("the repository check reads quoted steps and uses keys", () => {
-    checkMutation(
-      (text) => text.replace("    steps:\n", '    "steps":\n').replace(checkoutRef, 'uses: actions/checkout@v4'),
-      /not pinned by commit SHA/,
-    );
-    checkMutation((text) => text.replace(checkoutRef, '"uses": actions/checkout@v4'), /not pinned by commit SHA/);
-  });
-
-  test("the repository check reads a quoted job-level uses key", () => {
-    checkMutation(
-      (text) => text.replace(/^jobs:\n/m, 'jobs:\n  extra:\n    permissions: {}\n    "uses": owner/repo/.github/workflows/build.yml@v1\n'),
-      /not pinned by commit SHA/,
-    );
-  });
-
-  test("the repository check ignores a commented-out action reference", () => {
-    checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
-  });
-
-  test("the repository check rejects missing top-level permissions", () => {
-    checkMutation((text) => text.replace(/^permissions: \{\}\n/m, ""), /top-level `permissions: \{\}` is required/);
-  });
-
-  for (const [label, value] of [
-    ["write-all", "write-all"],
-    ["quoted write-all", '"write-all"'],
-    ["read-all", "read-all"],
-    ["an expression", "${{ inputs.permissions }}"],
-    ["an inline scalar with a trailing comment", "write-all # why not"],
-  ]) {
-    test(`the repository check rejects a job with permissions ${label}`, () => {
-      checkMutation(withJobPermissions(`    permissions: ${value}`), /unscoped permissions/);
+  describe("the rendered workflow", () => {
+    test("pins every action reference by commit SHA", () => {
+      const uses = [...workflow().matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)/gm)].map((m) => m[1]);
+      assert.ok(uses.length > 0);
+      for (const ref of uses) assert.match(ref, /^[\w.-]+\/[\w.-]+(\/[\w./-]+)?@[0-9a-f]{40}$/, ref);
     });
-  }
 
-  test("the repository check rejects a job with an empty permissions block", () => {
-    checkMutation(withJobPermissions("    permissions:"), /unscoped permissions/);
-  });
-
-  test("the repository check rejects a permission level that is not read, write or none", () => {
-    checkMutation(withJobPermissions("    permissions:\n      contents: admin"), /unscoped permissions/);
-  });
-
-  for (const [label, replacement] of [
-    ["an empty mapping", "    permissions: {}"],
-    ["a block of quoted levels", '    permissions:\n      contents: "read"\n      id-token: \'write\''],
-    ["a block of several scopes", "    permissions:\n      contents: read\n      id-token: write # publish"],
-  ]) {
-    test(`the repository check accepts a job with permissions as ${label}`, () => {
-      checkMutation(withJobPermissions(replacement), null);
+    test("denies permissions at the top level and scopes them per job", () => {
+      assert.match(workflow(), /^permissions: \{\}$/m);
+      assert.match(workflow(), jobPermissions);
     });
-  }
 
-  test("the repository check finds a job without permissions after a column-zero comment", () => {
-    checkMutation(withExtraJob("# a comment at column zero\n"), /job `extra` has no permissions block/);
+    test("runs unfiltered and is callable from another workflow", () => {
+      const text = workflow();
+      assert.match(text, /^ {2}workflow_call:/m);
+      assert.match(text, /^ {2}pull_request:/m);
+      assert.match(text, /^ {2}push:/m);
+      assert.doesNotMatch(text, /^\s*(paths|paths-ignore|branches|branches-ignore|tags):/m);
+    });
+
+    test("runs the repository's own check", () => {
+      assert.match(workflow(), /run: npm run check$/m);
+      assert.match(workflow(), /run: npm ci$/m);
+    });
+
+    test("fails when generated output is stale", () => {
+      const file = join(repo, "skills/hello/SKILL.md");
+      const original = readFileSync(file, "utf8");
+      writeFileSync(file, `${original}\nhand edit\n`);
+      try {
+        assert.throws(
+          () => execFileSync("npm", ["run", "check"], { cwd: repo, stdio: "pipe", timeout: FIVE_MINUTES }),
+          (error) => /drift|out of date|stale|differ|generate/i.test(String(error.stderr) + String(error.stdout)),
+        );
+      } finally {
+        writeFileSync(file, original);
+      }
+    });
+
+    test("has a repository check with no dependencies", () => {
+      const script = readFileSync(join(repo, "scripts/check-repo.mjs"), "utf8");
+      for (const [, specifier] of script.matchAll(/(?:\bfrom|\bimport\s*\(?|\brequire\()\s*["']([^"']+)["']/g)) {
+        assert.match(specifier, /^node:/, specifier);
+      }
+    });
+
+    test("passes its own check", () => runRepoCheck());
   });
 
-  test("the repository check stops scanning jobs at the next top-level key", () => {
-    checkMutation((text) => `${text.trimEnd()}\nenv:\n  not-a-job:\n`, null);
+  describe("action pinning", () => {
+    rejects("an unpinned step", (t) => t.replace(checkout, "- uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step behind other keys", (t) => t.replace(checkout, "- name: checkout\n        uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step after a short first key", (t) => t.replace(checkout, "- env:\n          X: y\n        uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step after a with: first key", (t) => t.replace(checkout, "- with:\n          a: b\n        uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step after a folded first key", (t) => t.replace(checkout, "- name: >-\n          Check out\n        uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step after a literal first key", (t) => t.replace(checkout, "- if: |\n          true\n        uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step whose dash is on its own line", (t) => t.replace(checkout, "-\n        uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("an unpinned step with a quoted uses key", (t) => t.replace(checkout, '- "uses": actions/checkout@v4'), NOT_PINNED);
+    rejects("an unpinned step under a quoted steps key", (t) => t.replace("    steps:\n", '    "steps":\n').replace(checkout, "- uses: actions/checkout@v4"), NOT_PINNED);
+    rejects("a uses value on the next line", (t) => t.replace(checkout, "- uses:\n          actions/checkout@v4"), UNSUPPORTED);
+    rejects("a docker image ending in 40 hex characters", (t) => t.replace(checkout, `- uses: docker://evil/img:latest@${SHA}`), NOT_PINNED);
+    rejects("a docker image with a short digest", (t) => t.replace(checkout, `- uses: docker://alpine@sha256:${"b".repeat(63)}`), NOT_PINNED);
+    rejects("a reference with a second @ revision", (t) => t.replace(checkout, `- uses: actions/checkout@v4@${SHA}`), NOT_PINNED);
+    rejects("an unpinned reusable workflow on a job", reusableJob("owner/repo/.github/workflows/build.yml@v1"), NOT_PINNED);
+    rejects("an unpinned reusable workflow behind a quoted key", withJob('  extra:\n    permissions: {}\n    "uses": owner/repo/.github/workflows/b.yml@v1\n'), NOT_PINNED);
+    rejects("an empty uses value", (t) => t.replace(checkout, "- uses:"), /`uses:` has no value|unsupported|nested block/);
+    accepts("a pinned reusable workflow on a job", reusableJob(`owner/repo/.github/workflows/build.yml@${SHA}`));
+    accepts("a local reusable workflow on a job", reusableJob("./.github/workflows/build.yml"));
+    accepts("a local action", (t) => t.replace(checkout, "- uses: ./.github/actions/setup"));
+    accepts("a quoted pinned reference", (t) => t.replace(checkout, `- uses: "actions/checkout@${SHA}"`));
+    accepts("a pinned docker image", (t) => t.replace(checkout, `- uses: docker://alpine@sha256:${"c".repeat(64)}`));
+    accepts("a pinned reference followed by a comment", (t) => t.replace(checkout, `- uses: actions/checkout@${SHA} # v4`));
+    accepts("a uses key that is not a step key", withStep("        env:\n          uses: harmless\n"));
+    accepts("a uses key in a matrix entry", (t) => t.replace("    steps:\n", "    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n            uses: ordinary\n    steps:\n"));
+    accepts("uses text inside a run block", withStep("      - run: |-\n          echo uses: actions/checkout@v4\n          - uses: actions/checkout@v4\n"));
+    accepts("uses text inside a single-line run command", withStep('      - run: echo "uses: actions/checkout@v4"\n'));
+    accepts("a commented-out step", withStep("      # - uses: actions/checkout@v4\n"));
+
+    test("rejects an unpinned step in a local composite action", () => {
+      checkRepo({ ".github/actions/setup/action.yml": "name: setup\nruns:\n  using: composite\n  steps:\n    - uses: actions/checkout@v4\n" }, NOT_PINNED);
+    });
+
+    test("accepts a pinned step in a local composite action", () => {
+      checkRepo({ ".github/actions/setup/action.yml": `name: setup\nruns:\n  using: composite\n  steps:\n    - uses: actions/checkout@${SHA}\n` }, null);
+    });
+
+    test("ignores YAML under .github/actions that is not an action", () => {
+      checkRepo({ ".github/actions/setup/fixtures/data.yml": "steps:\n  - uses: actions/checkout@v4\n" }, null);
+    });
+
+    test("scans a workflow in a nested directory and with the .yaml extension", () => {
+      checkRepo({ ".github/workflows/nested/extra.yaml": `permissions: {}\njobs:\n  a:\n    permissions: {}\n    steps:\n      - uses: actions/checkout@v4\n` }, NOT_PINNED);
+    });
   });
 
-  test("the repository check reports write-all on a job added behind a comment", () => {
-    checkMutation(withExtraJob("# note\n", "    permissions: write-all\n"), /job `extra` has unscoped permissions/);
-  });
-
-  test("the repository check has no dependencies", () => {
-    const script = readFileSync(join(repo, "scripts/check-repo.mjs"), "utf8");
-    for (const [, specifier] of script.matchAll(/(?:\bfrom|\bimport\s*\(?|\brequire\()\s*["']([^"']+)["']/g)) {
-      assert.match(specifier, /^node:/, specifier);
+  describe("permissions", () => {
+    rejects("missing top-level permissions", (t) => t.replace(/^permissions: \{\}\n/m, ""), /top-level `permissions: \{\}` is required/);
+    rejects("a top-level write-all", (t) => t.replace(/^permissions: \{\}$/m, "permissions: write-all"), /top-level `permissions: \{\}` is required/);
+    rejects("a top-level block of scopes", (t) => t.replace(/^permissions: \{\}$/m, "permissions:\n  contents: read"), /top-level `permissions: \{\}` is required/);
+    rejects("a job without permissions", withJob("  extra:\n    runs-on: ubuntu-latest\n    steps: []\n"), /job `extra` has no permissions block/);
+    rejects("a quoted job id without permissions", withJob('  "extra":\n    runs-on: ubuntu-latest\n    steps: []\n'), /job `extra` has no permissions block/);
+    rejects("a last job without permissions", (t) => `${t.trimEnd()}\n  last:\n    runs-on: ubuntu-latest\n    steps: []\n`, /job `last` has no permissions block/);
+    rejects("a middle job without permissions", (t) => `${t.trimEnd()}\n  middle:\n    runs-on: ubuntu-latest\n    steps: []\n  tail:\n    permissions: {}\n    steps: []\n`, /job `middle` has no permissions block/);
+    for (const [label, value] of [
+      ["write-all", "write-all"],
+      ["quoted write-all", '"write-all"'],
+      ["read-all", "read-all"],
+      ["an expression", "${{ inputs.permissions }}"],
+      ["write-all with a trailing comment", "write-all # why not"],
+    ]) {
+      rejects(`job permissions set to ${label}`, withJobPermissions(`    permissions: ${value}`), UNSCOPED);
     }
+    rejects("an empty permissions block", withJobPermissions("    permissions:"), UNSCOPED);
+    rejects("a permission level that is not read, write or none", withJobPermissions("    permissions:\n      contents: admin"), UNSCOPED);
+    rejects("a valid scope next to an invalid one", withJobPermissions("    permissions:\n      contents: read\n      id-token: admin"), UNSCOPED);
+    rejects("an inline permissions mapping", withJobPermissions("    permissions: { contents: read }"), FLOW);
+    accepts("an empty permissions mapping", withJobPermissions("    permissions: {}"));
+    accepts("an empty permissions mapping with a space", withJobPermissions("    permissions: { }"));
+    accepts("a top-level empty mapping with a space", (t) => t.replace(/^permissions: \{\}$/m, "permissions: { }"));
+    accepts("a block of several scopes", withJobPermissions("    permissions:\n      contents: read\n      id-token: write # publish"));
+    accepts("quoted permission levels", withJobPermissions('    permissions:\n      contents: "read"\n      id-token: \'write\''));
+    accepts("a comment between scopes", withJobPermissions("    permissions:\n      contents: read\n      # for the release\n      id-token: write"));
+    accepts("permission scopes indented four spaces", withJobPermissions("    permissions:\n        contents: read"));
+  });
+
+  describe("fails closed on YAML it cannot read", () => {
+    rejects("a flow-mapping step", (t) => t.replace(checkout, "- { name: x, with: { a: b }, uses: actions/checkout@v4 }"), FLOW);
+    rejects("a minimal flow-mapping step", (t) => t.replace(checkout, "- { uses: actions/checkout@v4 }"), FLOW);
+    rejects("a flow node on its own line", (t) => t.replace(/ {4}steps:\n[^]*$/, "    steps:\n      [{uses: actions/checkout@v4}]\n"), FLOW);
+    rejects("a flow-style job", withJob("  extra: { runs-on: ubuntu-latest, steps: [{ uses: actions/checkout@v4 }] }\n"), FLOW);
+    rejects("a multi-line flow sequence", withStep("        with: [\n          a\n        ]\n"), FLOW);
+    rejects("a flow sequence of steps", (t) => t.replace("    steps:\n", "    steps: [{ uses: actions/checkout@v4 }]\n    old:\n"), FLOW);
+    rejects("steps written as a flow list of words", (t) => t.replace(/ {4}steps:\n[^]*$/, "    steps: [a, b]\n"), FLOW);
+    rejects("an anchor on a job", withJob("  extra: &anchor\n    runs-on: ubuntu-latest\n    steps: []\n"), UNSUPPORTED);
+    rejects("an alias value", withStep("        env: *shared\n"), UNSUPPORTED);
+    rejects("a merge key", (t) => t.replace("    runs-on: ubuntu-latest\n", "    runs-on: ubuntu-latest\n    <<: *defaults\n"), UNSUPPORTED);
+    rejects("a tag on steps", (t) => t.replace("    steps:\n", "    steps: !!seq\n"), UNSUPPORTED);
+    rejects("a tag on a job", withJob("  extra: !!map\n    runs-on: ubuntu-latest\n    steps: []\n"), UNSUPPORTED);
+    rejects("an explicit key", (t) => t.replace("    steps:\n", "    ? steps\n    :\n"), UNSUPPORTED);
+    rejects("an escaped quoted key", (t) => t.replace(checkout, '- "u\\u0073es": actions/checkout@v4'), UNSUPPORTED);
+    rejects("a compact JSON-style steps value", (t) => t.replace(/ {4}steps:\n[^]*$/, '    "steps":[{"uses":"actions/checkout@v4"}]\n'), UNSUPPORTED);
+    rejects("a multi-line plain scalar", withStep("        name: first\n          second\n"), /nested block/);
+    rejects("a multi-line quoted scalar", withStep('        name: "first\n          second"\n'), /quoted scalars|nested block|unsupported/);
+    rejects("a duplicate key", withJobPermissions("    permissions: {}\n    permissions: write-all"), /duplicate key `permissions`/);
+    rejects("a duplicate uses key", (t) => t.replace(checkout, `- uses: actions/checkout@${SHA}\n        uses: actions/checkout@v4`), /duplicate key `uses`/);
+    rejects("an upper-case protected key", (t) => t.replace(checkout, "- USES: actions/checkout@v4"), /must be lowercase/);
+    rejects("a second document", (t) => `${t}---\njobs:\n`, /multiple documents/);
+    rejects("a tab indent", withStep("\tname: x\n"), /tabs are not supported/);
+    rejects("a lone carriage return", withStep("        name: a\r        uses: actions/checkout@v4\n"), /unsupported line break characters/);
+    rejects("inconsistent job indentation", withJob("    extra:\n        runs-on: ubuntu-latest\n        steps: []\n"), /inconsistent indentation/);
+    rejects("a jobs mapping without jobs", (t) => t.replace(/^jobs:\n[^]*$/m, "jobs:\nenv:\n  A: b\n"), /`jobs:` has no jobs/);
+    rejects("a workflow with no jobs mapping", (t) => t.replace(/^jobs:/m, "tasks:"), /no `jobs:` mapping found/);
+    accepts("an empty flow collection and expressions", withStep('      - run: echo "${{ github.sha }} [a] {b}"\n        env: {}\n'));
+    accepts("quoted text holding brackets and colons", withStep('      - name: "result: [ok]"\n        run: true\n'));
+    accepts("a flow list of plain words", (t) => t.replace("  push:\n", "  push:\n    branches: [main, release-1.0]\n"));
+    accepts("a matrix of flow lists", (t) => t.replace("    steps:\n", "    strategy:\n      matrix:\n        node: [18, 20]\n    steps:\n"));
+    accepts("a dash and an asterisk inside a command", withStep("      - name: Deploy - *prod* only\n        run: rm -rf -- *tmp\n"));
+    accepts("a folded scalar", withStep("      - run: >-\n          npm ci &&\n          npm test\n"));
+    accepts("a block scalar on the first key of a step", withStep("      - name: |\n          multi\n          line\n        run: echo ok\n"));
+    accepts("a document start marker", (t) => `---\n${t}`);
+    accepts("a byte order mark", (t) => `\uFEFF${t}`);
+    accepts("CRLF line endings", (t) => t.replace(/\n/g, "\r\n"));
+
+    test("accepts jobs indented four spaces consistently", () => {
+      checkRepo({ ".github/workflows/four.yml": "permissions: {}\njobs:\n    a:\n        permissions: {}\n        steps:\n            - run: true\n" }, null);
+    });
+
+    test("rejects a job indented four spaces without permissions", () => {
+      checkRepo({ ".github/workflows/four.yml": "permissions: {}\njobs:\n    a:\n        runs-on: x\n" }, /job `a` has no permissions block/);
+    });
+
+    test("reports a missing workflows directory", () => {
+      const empty = scratchDir();
+      assert.throws(
+        () => execFileSync("node", [join(repo, "scripts/check-repo.mjs")], { cwd: empty, stdio: "pipe" }),
+        failsWith(/no workflows found/),
+      );
+    });
+
+    test("reports a directory named like a workflow", () => {
+      const dir = join(repo, ".github/workflows/dir.yml");
+      mkdirSync(dir);
+      try {
+        assert.throws(runRepoCheck, failsWith(/dir\.yml: not a readable file/));
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 });
 
