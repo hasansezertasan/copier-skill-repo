@@ -9,8 +9,6 @@ _answers_file: .copier-answers.yml
 # three-way merged; the `version` in package.json merges as a local edit.
 _skip_if_exists:
   - .ai-rulez/skills/**
-  - README.md
-  - CHANGELOG.md
   - .release-please-manifest.json
 
 # Generated output (skills/, plugin manifests, marketplace catalogs) is never

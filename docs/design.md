@@ -34,7 +34,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 ## Docs and ownership
 
 - Template-owned and three-way merged: `CONTRIBUTING.md` (includes the manual one-time setup checklist and a note on `references/` and `evals/` layouts) and `docs/installation.md` (per-runtime install steps).
-- Repo-owned (never overwritten): `.ai-rulez/skills/**`, `README.md`, `CHANGELOG.md`, the release-please manifest, and `version` in `package.json`.
+- Repo-owned (never overwritten): `.ai-rulez/skills/**`, the release-please manifest, and `version` in `package.json`. `README.md` is a three-way merged skeleton; `CHANGELOG.md` is created by release-please.
 - Not owned: maintainers docs and per-repo ADRs.
 
 ## Rollout

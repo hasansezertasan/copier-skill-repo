@@ -34,5 +34,5 @@ _Avoid_: Agent, harness, host
 A repo that merely relates to skills, such as homebrew-news (a Python app with a Hermes plugin). Out of the template's scope.
 
 **Repo-owned file**:
-A scaffold-location file a skill repo edits freely after generation, so `copier update` never overwrites it: `.ai-rulez/skills/**`, `README.md`, `CHANGELOG.md`, the release-please manifest and the `version` in `package.json`. Every other scaffold file is template-owned and three-way merged.
+A scaffold-location file a skill repo edits freely after generation, so `copier update` never overwrites it: `.ai-rulez/skills/**`, the release-please manifest and the `version` in `package.json`. Every other scaffold file, `README.md` included, is template-owned and three-way merged; `CHANGELOG.md` is created by release-please, not the template.
 _Avoid_: User file, custom file

@@ -595,7 +595,6 @@ describe("copier update", () => {
     // The template moves on: it changes template-owned and repo-owned files alike.
     edit(source, "template/CONTRIBUTING.md.jinja", "## Commits and pull requests", "## Commits and pull requests\n\n> Template note.");
     edit(source, "template/package.json.jinja", '"node": ">=20"', '"node": ">=22"');
-    edit(source, "template/README.md.jinja", "{{ description }}", "{{ description }} Template change.");
     edit(source, "template/.ai-rulez/skills/{{ placeholder_skill }}/SKILL.md.jinja", "Placeholder skill", "Template placeholder");
     edit(source, "template/.release-please-manifest.json", '"0.0.0"', '"0.0.1"');
     git(source, "add", "-A");
