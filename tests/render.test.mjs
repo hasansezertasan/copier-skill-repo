@@ -241,6 +241,22 @@ describe("hardened CI", () => {
     checkMutation((text) => text.replace(/^jobs:\n/m, "tasks:\n"), /no `jobs:` mapping found/);
   });
 
+  test("the repository check ignores a uses key in a non-step flow mapping", () => {
+    checkMutation((text) => text.replace(/^permissions: \{\}\n/m, "permissions: {}\nenv: { uses: harmless }\n"), null);
+  });
+
+  test("the repository check rejects an unpinned action written as a flow-mapping step", () => {
+    checkMutation(
+      (text) => text.replace(checkoutRef, "uses: actions/checkout@v4").replace("- uses: actions/checkout@v4", "- { name: x, uses: actions/checkout@v4 }"),
+      /not pinned by commit SHA/,
+    );
+  });
+
+  test("the repository check accepts quoted permission levels", () => {
+    checkMutation(withJobPermissions('    permissions:\n      contents: "read"\n      id-token: \'write\''), null);
+    checkMutation(withJobPermissions('    permissions: { contents: "read", id-token: \'write\' }'), null);
+  });
+
   test("the repository check ignores a commented-out action reference", () => {
     checkMutation((text) => `${text}# uses: actions/checkout@v4\n`, null);
   });

@@ -38,7 +38,7 @@ const readYaml = (path) => {
 
 // A job's `permissions:` must be `{}` or scopes set to read, write or none:
 // no scalar such as `write-all`, no expression, no empty block.
-const SCOPE = /^[\w-]+:\s*(read|write|none)$/;
+const SCOPE = /^[\w-]+:\s*(["']?)(read|write|none)\1$/;
 const scopedPermissions = (value, children) => {
   if (value === "{}") return true;
   if (value.startsWith("{") && value.endsWith("}")) {
@@ -49,7 +49,7 @@ const scopedPermissions = (value, children) => {
 };
 
 // Workflows and local composite actions both reference third-party actions.
-const USES = /(?:^\s*(?:-\s+)*|[{,]\s*)["']?uses["']?\s*:\s*["']?([^\s"',}]*)/g;
+const USES = /(?:^\s*(?:-\s+)*|^\s*-\s*\{(?:[^{}]*,)?\s*)["']?uses["']?\s*:\s*["']?([^\s"',}]*)/g;
 for (const path of [...workflows, ...yamlFiles(".github/actions")]) {
   const lines = readYaml(path);
   lines.forEach((line, index) => {
