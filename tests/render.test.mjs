@@ -794,6 +794,10 @@ describe("four runtimes", () => {
         assert.match(doc, new RegExp(`^\\| ${runtime} \\|`, "m"), `${runtime} row`);
       }
       assert.doesNotMatch(doc, /scoop/i, "no text borrowed from another repo");
+      // Caveats that must survive: copied skills are verified, not just the
+      // clone, and the Codex update route is flagged as unverified.
+      assert.match(doc, /`diff -r <clone>\/skills <destination>` prints nothing/);
+      assert.match(doc, /`marketplace upgrade` applies to Git marketplaces, not a local path; this update route has not been verified/);
       // A bare `pi update` updates Pi itself; a package needs its source.
       assert.match(doc, /`pi update npm:demo-skills`/);
       assert.match(doc, /`pi update git:github\.com\/acme\/demo-skills`/);
