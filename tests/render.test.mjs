@@ -1115,6 +1115,43 @@ describe("runtimes", () => {
         }
       });
 
+      describe("allowlist", () => {
+        const withAllowlist = (content, run) => {
+          const allowlist = join(repo, ".config", "root-components.json");
+          mkdirSync(dirname(allowlist), { recursive: true });
+          writeFileSync(allowlist, content);
+          mkdirSync(join(repo, "hooks"));
+          try {
+            run();
+          } finally {
+            rmSync(join(repo, "hooks"), { recursive: true, force: true });
+            rmSync(allowlist, { force: true });
+          }
+        };
+
+        test("passes a component listed with a reason", () => {
+          withAllowlist(JSON.stringify({ hooks: "Claude SessionStart hook" }), () => check(repo));
+        });
+
+        test("still fails a component that is not listed", () => {
+          withAllowlist(JSON.stringify({ agents: "subagent" }), () => {
+            assert.throws(() => check(repo), failsWith(/root component: hooks/));
+          });
+        });
+
+        test("rejects an empty reason", () => {
+          withAllowlist(JSON.stringify({ hooks: " " }), () => {
+            assert.throws(() => check(repo), failsWith(/root-components\.json: hooks needs a non-empty reason/));
+          });
+        });
+
+        test("rejects an unknown name", () => {
+          withAllowlist(JSON.stringify({ hook: "typo" }), () => {
+            assert.throws(() => check(repo), failsWith(/"hook" is not a root component/));
+          });
+        });
+      });
+
       test("still passes with the adapter and the generated skills at the root", () => {
         check(repo);
       });
