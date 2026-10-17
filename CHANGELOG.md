@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.3.0...v0.4.0) (2026-10-17)
+
+
+### Features
+
+* let a repo allowlist root components it ships on purpose ([#52](https://github.com/hasansezertasan/copier-skill-repo/issues/52)) ([9c353fa](https://github.com/hasansezertasan/copier-skill-repo/commit/9c353fa9d24d21ac1f4b97ca3a5c1fe03147a566))
+
+
+### Bug Fixes
+
+* mark the OpenCode config shape unverified and stop counting clone-reading as an install ([#50](https://github.com/hasansezertasan/copier-skill-repo/issues/50)) ([84a8875](https://github.com/hasansezertasan/copier-skill-repo/commit/84a88750bf7921e20d485853573bda3616fe39f2))
+
 ## [0.3.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.2.0...v0.3.0) (2026-10-17)
 
 
