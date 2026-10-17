@@ -19,7 +19,8 @@
 //   - no host-loaded component at the repository root (`.mcp.json`, `hooks/`,
 //     ...), anywhere this runs: both catalogs install the root, so the host
 //     would ship it. ai-rulez reports these as AR9T0, a rule the template turns
-//     off for the adapter.
+//     off for the adapter. A repo that ships one on purpose lists it, with the
+//     reason, in `.config/root-components.json`.
 // Scanned: `.github/workflows` and `action.yml`/`action.yaml` under
 // `.github/actions`. Local actions elsewhere are not followed.
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -297,8 +298,23 @@ const ROOT_COMPONENTS = [
   "themes",
   "monitors",
 ];
+// Opt-in for a repo that ships a root component deliberately (infra-copilot's
+// SessionStart hook and subagent). `.config/root-components.json` is repo-owned
+// and absent by default: an object mapping each allowed component to the reason
+// it ships. An unknown name or an empty reason is an error, so a typo or a bare
+// opt-out cannot pass.
+const ALLOWLIST = ".config/root-components.json";
+const allowed = new Set();
+if (lexists(ALLOWLIST)) {
+  const list = readManifest(ALLOWLIST);
+  for (const [name, reason] of Object.entries(list ?? {})) {
+    if (!ROOT_COMPONENTS.includes(name)) problems.push(`${ALLOWLIST}: ${JSON.stringify(name)} is not a root component this check knows`);
+    else if (typeof reason !== "string" || reason.trim() === "") problems.push(`${ALLOWLIST}: ${name} needs a non-empty reason string`);
+    else allowed.add(name);
+  }
+}
 for (const name of ROOT_COMPONENTS) {
-  if (lexists(name)) {
+  if (!allowed.has(name) && lexists(name)) {
     problems.push(`root component: ${name} is loaded by the host from the installed plugin root; move it out of the repository root`);
   }
 }
