@@ -25,9 +25,9 @@ Each adoption is one PR in the adopting repo, pinned at a release tag, with an A
 
 ## Updating an adopted repo
 
-`copier update --trust --vcs-ref vX.Y.Z` in a fresh branch. Expect conflicts in `README.md` (keep the repo's), `.ai-rulez/config.toml` (merge into the existing `[lint.severity]` table), `CONTRIBUTING.md` and `docs/installation.md` (keep both sides). Regenerate with `npm run generate` after resolving, and check that `skills/` and the manifests do not change unless the template meant them to.
+`copier update --trust --skip-tasks --vcs-ref vX.Y.Z` in a fresh branch. Expect conflicts in `README.md` (keep the repo's), `.ai-rulez/config.toml` (merge into the existing `[lint.severity]` table), `CONTRIBUTING.md` and `docs/installation.md` (keep both sides).
 
-Resolve `.ai-rulez/config.toml` first and keep the repo's `shared_resources`. The template's `_tasks` run `npm run generate` during the update, and generating without `shared_resources` rewrites every skill: each `SKILL.md` changes and the per-skill `references/` copies are deleted (seen in scoop-bucket-skills#24, where the links in six skill files changed). If `skills/` drifts during an update, restore the setting and run `npm run generate` again before committing.
+Skip the tasks. The template's `_tasks` run `npm install` and `npm run generate` inside the update, before you can resolve the conflicts, and generating without the repo's `shared_resources` rewrites every skill: each `SKILL.md` changes and the per-skill `references/` copies are deleted (seen in scoop-bucket-skills#24, where the links in six skill files changed). So resolve `.ai-rulez/config.toml` first, keeping the repo's `shared_resources`, then run `npm install` and `npm run generate` yourself and check that `skills/` and the manifests do not change unless the template meant them to. If `skills/` drifts, restore the setting and run `npm run generate` again before committing.
 
 ## Known gaps
 
