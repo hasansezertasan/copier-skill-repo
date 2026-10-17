@@ -96,6 +96,16 @@ describe("rendered with default answers", () => {
     );
   });
 
+  test("declares a Node range its locked dependencies support", () => {
+    // `npm run generate` and `npm run check` run the locked ai-rulez binary, so
+    // the advertised minimum must not be lower than the one ai-rulez needs.
+    const major = (range) => Number(/(\d+)/.exec(range)[1]);
+    const lock = readJson(repo, "package-lock.json");
+    const needed = lock.packages["node_modules/ai-rulez"].engines.node;
+    const declared = readJson(repo, "package.json").engines.node;
+    assert.ok(major(declared) >= major(needed), `engines.node ${declared} is below ai-rulez's ${needed}`);
+  });
+
   test("uses package.json as the version source", () => {
     const pkg = readJson(repo, "package.json");
     assert.equal(pkg.version, "0.0.0");
