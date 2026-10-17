@@ -1,4 +1,4 @@
-# copier-skills design
+# copier-skill-repo design
 
 Decisions from the design grilling session (2026-10-15). Terms are defined in `CONTEXT.md`; the generator choice is in `docs/adr/0001-ai-rulez-as-the-generator.md`. Surveyed repos: scoop-bucket-skills, ghost-library-skills, infra-copilot (skill repos) and homebrew-news (not one).
 
@@ -25,7 +25,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 - Release uses release-please on conventional commits.
 - `publish_to_npm` (default yes) controls publishing with trusted publishing and provenance. When off, the publish job is dropped and `package.json` is `"private": true`; Pi users then install from git.
 - Renovate extends `local>hasansezertasan/renovate-config`. Template updates arrive as `copier update` PRs through `.copier-answers.yml`, as in copier-pyproject.
-- copier-skills versions itself with release-please and git tags, which `copier update` resolves against.
+- copier-skill-repo versions itself with release-please and git tags, which `copier update` resolves against.
 
 ## Questions the template asks
 

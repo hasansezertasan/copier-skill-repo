@@ -21,7 +21,7 @@ const FIVE_MINUTES = 5 * 60 * 1000;
 const scratchEnv = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
 
 function scratchDir() {
-  const dir = mkdtempSync(join(tmpdir(), "copier-skills-"));
+  const dir = mkdtempSync(join(tmpdir(), "copier-skill-repo-"));
   workDirs.push(dir);
   return dir;
 }
