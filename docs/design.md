@@ -41,4 +41,4 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 
 - Template CI renders with defaults and runs `npm ci && npm run check`. Diffing against real repos belongs to each adoption PR.
 - Adoption order: scoop-bucket-skills, then ghost-library-skills, then infra-copilot (ai-rulez v4, shell checks, no `package.json`).
-- v1 ships no `setup` or `adopt` skills. After two repos are adopted, decide whether to add ones modeled on copier-pyproject's.
+- v1 ships no `setup` or `adopt` skills. After two repos are adopted, decide whether to add ones modeled on copier-pyproject's. Decided in `docs/adr/0003-no-setup-or-adopt-skills-yet.md`: not yet; `docs/adopting.md` holds the recipe.
