@@ -18,8 +18,8 @@ You were pointed here to install the skills. Do this:
 1. Pick the route in the table below that you can run yourself on your platform. Prefer a route native to your runtime over a manual clone.
 2. If a route needs a slash command or an interactive step you cannot run, give the user the exact command and ask them to run it. Do not guess at another command.
 3. Confirm the install with the route's confirm step.
-4. Plugin and skills installs usually load in a new session, not in the conversation that installed them. If the skills are not available to you now, read `skills/<name>/SKILL.md` from a clone of this repository (a temporary clone is fine) and tell the user to start a new session so the installed skills load next time.
-5. If a route fails, fall back to the manual route. Do not report the install as done until you have confirmed the skills or read a `SKILL.md`.
+4. Plugin and skills installs usually load in a new session, not in the conversation that installed them. If the skills are not available to you now, you may read `skills/<name>/SKILL.md` from a clone of this repository (a temporary clone is fine) to do the user's task in this conversation, and tell the user to start a new session so the installed skills load next time. Reading a clone is not an install: it registers nothing for later sessions.
+5. If a route fails, fall back to the manual route. Report the install as done only after the route's confirm step succeeds. Never report it as done because you read a `SKILL.md` from a clone.
 6. Do not install other agent skills or switch to a different route unless this one fails.
 
 ## Routes
@@ -49,7 +49,7 @@ mkdir -p ~/.agents/skills
 for skill in {{ repo_name }}/skills/*/; do ln -s "$PWD/${skill%/}" ~/.agents/skills/; done
 ```
 
-Alternatively, add the clone's `skills/` directory to OpenCode's configuration:
+Alternatively, add the clone's `skills/` directory to OpenCode's configuration. The `skills` array comes from OpenCode's published config schema, which marks the older object form (with a `paths` key) deprecated; OpenCode's documentation pages do not describe this option, so it is unverified in practice:
 
 ```json
 {

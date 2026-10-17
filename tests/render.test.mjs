@@ -981,6 +981,10 @@ describe("runtimes", () => {
       // OpenCode deprecates the object form `skills: { paths: [...] }`.
       assert.match(doc, /"skills": \["\/absolute\/path\/to\/demo-skills\/skills"\]/);
       assert.doesNotMatch(doc, /"paths"/);
+      assert.match(doc, /published config schema/);
+      assert.match(doc, /Reading a clone is not an install/);
+      assert.match(doc, /Report the install as done only after the route's confirm step succeeds/);
+      assert.doesNotMatch(doc, /or read a `SKILL\.md`/);
       assert.match(doc, /pi install npm:demo-skills/);
       assert.match(doc, /pi install git:github\.com\/acme\/demo-skills/);
       // The agent-facing page: a prompt, instructions for the reading agent and a
