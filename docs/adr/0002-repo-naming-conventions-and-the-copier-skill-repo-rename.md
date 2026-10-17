@@ -21,6 +21,8 @@ One name, two repos, and a reader cannot tell which generates which. The new ski
 
 Rename the template to `copier-skill-repo`. The name follows `copier-<subject>` with the generated kind of repo as the subject (the same way `copier-homebrew-tap` names a homebrew tap), and it matches the glossary term **Skill repo** in `CONTEXT.md`. The name `copier-skills` is left free for the skill repo about Copier.
 
+The conventions are guidance for the maintainer, not a template rule. The template neither enforces `<subject>-skills` nor mentions it in the `repo_name` help text, so any name that passes the existing validator stays valid, `infra-copilot` included. Decided 2026-10-17: flexibility over enforcement.
+
 Order of work: rename the GitHub repo (GitHub redirects the old URLs), update the live references in this repo, then correct `_src_path` and links in each downstream repo, one PR each. Create the new `copier-skills` skill repo only after every adopter points at the new name; creating it earlier would break the redirect from the old template URL.
 
 ## Considered Options
