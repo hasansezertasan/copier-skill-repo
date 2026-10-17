@@ -18,7 +18,9 @@ gitignore = false
 # Tested with codex-cli 0.162.1: a root plugin.json declaring the Antigravity
 # $schema is ignored and Codex falls back to .codex-plugin/plugin.json, but one
 # declaring the portable agent-plugins.org $schema is adopted as Codex's manifest.
-# Keep the Antigravity $schema, and re-test when Codex changes.
+# Keep the Antigravity $schema, and re-test when Codex changes. AR9T0 also
+# covers .mcp.json, hooks/ and the other host-loaded paths at the root, so
+# scripts/check-repo.mjs rejects those itself.
 [lint.severity]
 AR9T0 = "off"
 
