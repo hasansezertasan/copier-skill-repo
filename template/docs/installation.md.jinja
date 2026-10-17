@@ -34,7 +34,7 @@ You were pointed here to install the skills. Do this:
 {%- else %}
 | Pi | `pi install git:github.com/{{ github_owner }}/{{ repo_name }}` (not published to npm) | `pi update git:github.com/{{ github_owner }}/{{ repo_name }}` (a bare `pi update` updates Pi itself), then restart Pi or reload resources | invoke one of the skills with `/skill:<name>` |
 {%- endif %}
-| Antigravity | git only; see [Antigravity](#antigravity) | reinstall with the same command, then restart | the skills are listed by `agy plugin validate` in the clone, and available after a restart |
+| Antigravity | git only; see [Antigravity](#antigravity) | reinstall with the same command, then restart | `agy plugin list` shows the plugin as installed and enabled; restart Antigravity to load it |
 | Manual | clone this repository and read `skills/<name>/SKILL.md`, or copy `skills/*` into your agent's skills directory | `git pull` in the clone, then copy `skills/*` again if you copied them | the clone's `git rev-parse HEAD` matches the latest commit on `main`; if you copied the skills, `for d in <clone>/skills/*/; do diff -r "$d" "<destination>/$(basename "$d")"; done` prints nothing (compare skill by skill: the destination may hold skills from other sources) |
 
 The Pi package declares the `pi-package` keyword and a `pi.skills` entry pointing at `./skills` in `package.json`. To compare an installed version with the latest, use the version in `.claude-plugin/plugin.json` or the repository's latest GitHub release.
@@ -72,4 +72,4 @@ agy plugin install {{ repo_url }}
 
 This installs into Antigravity's user plugin registry, so the skills are available across repositories. There is no in-place update verb: reinstall with the same command, then restart.
 
-> **Unverified.** Only `agy plugin validate` on a local clone has been run for this kind of repository; installing from a Git URL has not been exercised against a remote. Prefer a supported runtime for production use until an install is verified.
+> **Unverified.** Installing from a Git URL has not been exercised against a remote; only `agy plugin validate` on a local clone has been run for this kind of repository, and it validates a source directory rather than proving an install. Confirm with `agy plugin list`, and prefer a supported runtime for production use until an install is verified.

@@ -966,7 +966,9 @@ describe("four runtimes", () => {
       assert.doesNotMatch(doc, /scoop/i, "no text borrowed from another repo");
       assert.match(doc, /five runtimes/);
       assert.match(doc, /agy plugin install https:\/\/github\.com\/acme\/demo-skills/);
-      assert.match(doc, /> \*\*Unverified\.\*\* Only `agy plugin validate`/);
+      assert.match(doc, /> \*\*Unverified\.\*\* Installing from a Git URL has not been exercised/);
+      // Confirm the installed plugin, not a clone: `agy plugin validate` checks a source directory.
+      assert.match(doc, /\| Antigravity \|[^\n]*`agy plugin list` shows the plugin as installed and enabled/);
       // Caveats that must survive: copied skills are verified, not just the
       // clone, and the Codex update route is flagged as unverified.
       // Per skill: a plain `diff -r` of the two directories would also report
@@ -1046,6 +1048,17 @@ describe("four runtimes", () => {
         timeout: FIVE_MINUTES,
       });
       assert.match(String(output), /check-repo: \d+ workflow\(s\) ok/);
+    });
+
+    // Valid JSON that is not an object must not slip past a truthiness guard.
+    for (const value of ["null", "false", "0", '""', "[]"]) {
+      test(`fails the check when the adapter is ${value}`, () => {
+        drift(() => `${value}\n`, /plugin\.json: must be a JSON object/);
+      });
+    }
+
+    test("keeps the Antigravity $schema, which Codex ignores, not the portable one it adopts", () => {
+      assert.equal(readJson(repo, adapter).$schema, "https://antigravity.google/schemas/v1/plugin.json");
     });
 
     test("fails the check when the adapter is not readable JSON", () => {

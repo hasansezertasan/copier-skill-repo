@@ -231,12 +231,19 @@ for (const path of yamlFiles(".github/actions", /^action\.ya?ml$/)) {
 // Antigravity installs straight from the Git URL, so nothing generates its
 // adapter. Keep its identity equal to the generated Claude manifest.
 const readManifest = (path) => {
+  let manifest;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    manifest = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
     problems.push(`${path}: cannot read as JSON (${error.code ?? error.name})`);
     return undefined;
   }
+  // Valid but falsy or non-object JSON (`null`, `0`, `[]`) is not a manifest.
+  if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) {
+    problems.push(`${path}: must be a JSON object`);
+    return undefined;
+  }
+  return manifest;
 };
 if (isFile(".claude-plugin/plugin.json")) {
   const claude = readManifest(".claude-plugin/plugin.json");

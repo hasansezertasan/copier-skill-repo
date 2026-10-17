@@ -15,6 +15,10 @@ gitignore = false
 # Antigravity installs straight from the Git URL. ai-rulez warns (AR9T0) that
 # Codex may load a root plugin.json too; the adapter carries only the plugin name
 # and description, and scripts/check-repo.mjs keeps it equal to the Claude manifest.
+# Tested with codex-cli 0.162.1: a root plugin.json declaring the Antigravity
+# $schema is ignored and Codex falls back to .codex-plugin/plugin.json, but one
+# declaring the portable agent-plugins.org $schema is adopted as Codex's manifest.
+# Keep the Antigravity $schema, and re-test when Codex changes.
 [lint.severity]
 AR9T0 = "off"
 
