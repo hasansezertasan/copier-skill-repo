@@ -419,6 +419,10 @@ describe("release", () => {
       // Without a release tag release-please starts at 1.0.0 whatever the seeded
       // manifest says; `initial-version` is what makes the first release 0.1.0.
       assert.equal(config["initial-version"], "0.1.0");
+      // Tags are plain `vX.Y.Z`. With the default, release-please adds the package
+      // name to the tag, no longer matches an earlier `v0.3.0`, and cannot find the
+      // last release (scoop-bucket-skills tagged `scoop-bucket-skills-v0.2.0`).
+      assert.equal(config["include-component-in-tag"], false);
       assert.equal(readJson(repo, "release-please-config.json")["bump-minor-pre-major"], true);
       // The default grouped title omits the version, so release-please cannot
       // recognise the merged release PR and silently creates no tag
@@ -654,6 +658,11 @@ describe("release safeguards", () => {
       }
     };
 
+    test("pushes generated commands and Pi prompts too", () => {
+      const result = run({ "commands/a.md": "x\n", ".pi/prompts/a.md": "x\n" });
+      assert.deepEqual([result.ok, result.committed], [true, true], result.stderr);
+    });
+
     test("pushes generated output, including an exact AGENTS.md", () => {
       const result = run({ ".ai-rulez-generated.json": '{"a":1}\n', "AGENTS.md": "new\n", "skills/new/SKILL.md": "x\n" });
       assert.deepEqual([result.ok, result.committed], [true, true], result.stderr);
@@ -664,6 +673,8 @@ describe("release safeguards", () => {
       ".github/workflows/evil.yml",
       "skills-evil/x",
       ".agents-evil/x",
+      "commands-evil/x",
+      ".pi-evil/x",
       ".ai-rulez-generated.json.evil",
       "package.json",
     ]) {
