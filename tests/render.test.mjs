@@ -985,6 +985,10 @@ describe("runtimes", () => {
       assert.match(doc, /Reading a clone is not an install/);
       assert.match(doc, /Report the install as done only after the route's confirm step succeeds/);
       assert.doesNotMatch(doc, /or read a `SKILL\.md`/);
+      // The manual route's confirm step must not be satisfiable by a clone alone.
+      const manual = doc.split("\n").find((line) => line.startsWith("| Manual |"));
+      assert.match(manual, /it is not an install/);
+      assert.doesNotMatch(manual, /rev-parse/);
       assert.match(doc, /pi install npm:demo-skills/);
       assert.match(doc, /pi install git:github\.com\/acme\/demo-skills/);
       // The agent-facing page: a prompt, instructions for the reading agent and a
