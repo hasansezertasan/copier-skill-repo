@@ -1026,6 +1026,28 @@ describe("four runtimes", () => {
       drift((text) => text.replace('"demo-skills"', '"other-skills"'), /plugin\.json: name "other-skills" does not match/);
     });
 
+    test("fails the check when the adapter file is missing", () => {
+      const original = readFileSync(join(repo, adapter), "utf8");
+      rmSync(join(repo, adapter));
+      try {
+        assert.throws(() => check(repo), failsWith(/plugin\.json: cannot read as JSON \(ENOENT\)/));
+      } finally {
+        writeFileSync(join(repo, adapter), original);
+      }
+    });
+
+    // CI runs this very command on the template repository, which has no
+    // generated output and therefore no adapter to compare.
+    test("leaves the template repository's own check passing", () => {
+      const output = execFileSync("node", ["template/scripts/check-repo.mjs"], {
+        cwd: templateRoot,
+        env: scratchEnv(),
+        stdio: "pipe",
+        timeout: FIVE_MINUTES,
+      });
+      assert.match(String(output), /check-repo: \d+ workflow\(s\) ok/);
+    });
+
     test("fails the check when the adapter is not readable JSON", () => {
       drift(() => "{ not json", /plugin\.json: cannot read as JSON/);
     });

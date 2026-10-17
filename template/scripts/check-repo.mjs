@@ -11,8 +11,9 @@
 // Block scalars (`run: |`) are skipped. Rules enforced:
 //   - top-level `permissions: {}` and a scoped `permissions` on every job;
 //   - every step's and job's `uses:` pinned by commit SHA (`./` is exempt);
-//   - the Antigravity adapter, the hand-maintained root `plugin.json`, carries
-//     the same `name` and `description` as the generated Claude manifest.
+//   - where the generated Claude manifest exists, the Antigravity adapter (the
+//     root `plugin.json`) exists and carries the same `name` and `description`.
+//     The template repository, which has no generated output, is skipped.
 // Scanned: `.github/workflows` and `action.yml`/`action.yaml` under
 // `.github/actions`. Local actions elsewhere are not followed.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -237,14 +238,16 @@ const readManifest = (path) => {
     return undefined;
   }
 };
-const adapter = readManifest("plugin.json");
-const claude = readManifest(".claude-plugin/plugin.json");
-if (adapter && claude) {
-  for (const field of ["name", "description"]) {
-    if (adapter[field] !== claude[field]) {
-      problems.push(
-        `plugin.json: ${field} ${JSON.stringify(adapter[field])} does not match .claude-plugin/plugin.json ${JSON.stringify(claude[field])}`,
-      );
+if (isFile(".claude-plugin/plugin.json")) {
+  const claude = readManifest(".claude-plugin/plugin.json");
+  const adapter = readManifest("plugin.json");
+  if (adapter && claude) {
+    for (const field of ["name", "description"]) {
+      if (adapter[field] !== claude[field]) {
+        problems.push(
+          `plugin.json: ${field} ${JSON.stringify(adapter[field])} does not match .claude-plugin/plugin.json ${JSON.stringify(claude[field])}`,
+        );
+      }
     }
   }
 }
