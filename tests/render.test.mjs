@@ -223,7 +223,9 @@ describe("hardened CI", () => {
       const text = workflow();
       assert.match(text, /^ {2}workflow_call:/m);
       assert.match(text, /^ {2}pull_request:/m);
-      assert.match(text, /^ {2}push:/m);
+      // A `push` trigger would run every job twice per pull-request commit, and
+      // again on `main`, where release.yml already calls this workflow.
+      assert.doesNotMatch(text, /^ {2}push:/m);
       assert.doesNotMatch(text, /^\s*(paths|paths-ignore|branches|branches-ignore|tags):/m);
     });
 
@@ -361,7 +363,7 @@ describe("hardened CI", () => {
     rejects("a workflow with no jobs mapping", (t) => t.replace(/^jobs:/m, "tasks:"), /no `jobs:` mapping found/);
     accepts("an empty flow collection and expressions", withStep('      - run: echo "${{ github.sha }} [a] {b}"\n        env: {}\n'));
     accepts("quoted text holding brackets and colons", withStep('      - name: "result: [ok]"\n        run: true\n'));
-    accepts("a flow list of plain words", (t) => t.replace("  push:\n", "  push:\n    branches: [main, release-1.0]\n"));
+    accepts("a flow list of plain words", (t) => t.replace("  pull_request:\n", "  pull_request:\n    branches: [main, release-1.0]\n"));
     accepts("a matrix of flow lists", (t) => t.replace("    steps:\n", "    strategy:\n      matrix:\n        node: [18, 20]\n    steps:\n"));
     accepts("a dash and an asterisk inside a command", withStep("      - name: Deploy - *prod* only\n        run: rm -rf -- *tmp\n"));
     accepts("a folded scalar", withStep("      - run: >-\n          npm ci &&\n          npm test\n"));
@@ -603,6 +605,9 @@ describe("release safeguards", () => {
     // Commit, then check the committed tree, then hand over: strict validation
     // fails on uncommitted generated output.
     assert.match(jobs.regenerate, /git commit -m "chore: regenerate plugin output for the release"[\s\S]*npm run check\n\s+git diff --binary HEAD~1 HEAD/);
+    // Whatever the allowlist did not stage is discarded before that check, so it
+    // reads the committed tree and not leftover generated files.
+    assert.match(jobs.regenerate, /git commit -m "chore: regenerate plugin output for the release"\n\s+git restore --worktree -- \.\n\s+git clean -fdq\n\s+npm run check\n\s+git diff --binary HEAD~1 HEAD/);
     assert.match(jobs.regenerate, /if: \$\{\{ steps\.regenerate\.outputs\.changed == 'true' \}\}\n\s+uses: actions\/upload-artifact@[0-9a-f]{40}/);
     // push applies only generated paths, from the artifact, and pushes the branch.
     assert.match(jobs.push, /needs: \[release-please, regenerate\]/);
