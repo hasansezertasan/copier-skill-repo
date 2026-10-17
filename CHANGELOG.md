@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.1.2...v0.2.0) (2026-10-17)
+
+
+### Features
+
+* add Antigravity as a template runtime ([#38](https://github.com/hasansezertasan/copier-skill-repo/issues/38)) ([cc256fb](https://github.com/hasansezertasan/copier-skill-repo/commit/cc256fbbfa587a33b33e24074a2969b459e2a76f))
+
 ## [0.1.2](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.1.1...v0.1.2) (2026-10-17)
 
 
