@@ -68,6 +68,21 @@ function installAndCheck(repo) {
 
 const readJson = (dir, path) => JSON.parse(readFileSync(join(dir, path), "utf8"));
 
+// True when the lower bound of `declared` is at least that of `needed`, so the
+// declared range admits no Node release the dependency rejects. Both are
+// `>=x[.y[.z]]` ranges, compared on the complete version; anything else throws
+// rather than passing silently.
+function nodeFloorCovers(declared, needed) {
+  const floor = (range) => {
+    const match = /^>=\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(range.trim());
+    if (!match) throw new Error(`unsupported Node range ${JSON.stringify(range)}: expected >=x[.y[.z]]`);
+    return [match[1], match[2] ?? 0, match[3] ?? 0].map(Number);
+  };
+  const [d, n] = [floor(declared), floor(needed)];
+  for (let i = 0; i < 3; i++) if (d[i] !== n[i]) return d[i] > n[i];
+  return true;
+}
+
 after(() => workDirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
 describe("rendered with default answers", () => {
@@ -99,11 +114,10 @@ describe("rendered with default answers", () => {
   test("declares a Node range its locked dependencies support", () => {
     // `npm run generate` and `npm run check` run the locked ai-rulez binary, so
     // the advertised minimum must not be lower than the one ai-rulez needs.
-    const major = (range) => Number(/(\d+)/.exec(range)[1]);
     const lock = readJson(repo, "package-lock.json");
     const needed = lock.packages["node_modules/ai-rulez"].engines.node;
     const declared = readJson(repo, "package.json").engines.node;
-    assert.ok(major(declared) >= major(needed), `engines.node ${declared} is below ai-rulez's ${needed}`);
+    assert.ok(nodeFloorCovers(declared, needed), `engines.node ${declared} admits Node versions below ai-rulez's ${needed}`);
   });
 
   test("uses package.json as the version source", () => {
@@ -1020,6 +1034,16 @@ describe("invalid answers", () => {
       assertRejected("github_owner", { github_owner });
     });
   }
+});
+
+test("compares the complete Node floor, not just the major", () => {
+  assert.equal(nodeFloorCovers(">=22", ">=22.0.0"), true);
+  assert.equal(nodeFloorCovers(">=22.12", ">=22.0.0"), true);
+  assert.equal(nodeFloorCovers(">=24", ">=22.5.0"), true);
+  assert.equal(nodeFloorCovers(">=22", ">=22.5.0"), false, "a minor bump in the dependency must be noticed");
+  assert.equal(nodeFloorCovers(">=22.5", ">=22.5.1"), false, "a patch bump must be noticed");
+  assert.equal(nodeFloorCovers(">=20", ">=22.0.0"), false);
+  assert.throws(() => nodeFloorCovers("^22", ">=22.0.0"), /unsupported Node range/);
 });
 
 test("the template stores no generated output", () => {
