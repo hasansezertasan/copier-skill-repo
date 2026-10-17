@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.2.0...v0.3.0) (2026-10-17)
+
+
+### Features
+
+* let ai-rulez own the Pi fields in package.json ([#46](https://github.com/hasansezertasan/copier-skill-repo/issues/46)) ([93092de](https://github.com/hasansezertasan/copier-skill-repo/commit/93092de0cda12492bc3ab402fd9ecda0620a1acb))
+
+
+### Bug Fixes
+
+* reject host-loaded root components in the repository check ([#47](https://github.com/hasansezertasan/copier-skill-repo/issues/47)) ([c463e44](https://github.com/hasansezertasan/copier-skill-repo/commit/c463e44ce2db69b6c9b5f76fa04a41944d5a1660))
+
 ## [0.2.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.1.2...v0.2.0) (2026-10-17)
 
 
