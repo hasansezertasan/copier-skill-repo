@@ -27,7 +27,7 @@ Files committed to the repo but produced from the source of truth (`AGENTS.md`, 
 _Avoid_: Build artifacts
 
 **Runtime**:
-An agent host that consumes the skills: Claude Code, Codex, OpenCode or Pi. All four are always supported.
+An agent host that consumes the skills: Claude Code, Codex, OpenCode, Pi or Antigravity. All five are always supported; OpenCode and Antigravity install from git only.
 _Avoid_: Agent, harness, host
 
 **Not a skill repo**:

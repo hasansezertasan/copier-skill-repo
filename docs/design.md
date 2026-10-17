@@ -7,7 +7,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 - The template owns the scaffold only. It never owns skill content.
 - It ships one placeholder skill: a minimal `SKILL.md` named from the `placeholder_skill` answer.
 - Out of scope: Hermes packaging and repos like homebrew-news.
-- Runtimes: Claude Code, Codex, OpenCode and Pi are always on.
+- Runtimes: Claude Code, Codex, OpenCode, Pi and Antigravity are always on. Antigravity installs from the Git URL, so its only artifact is a root `plugin.json` adapter (name and description from the answers); `check-repo.mjs` fails when it drifts from the generated Claude manifest.
 - OpenCode install is git-only (copy or symlink `skills/` into `.agents/skills/`). Official docs show no way for an npm package to ship skills to OpenCode, so `docs/installation.md` records this as an open question.
 
 ## Tooling
@@ -17,7 +17,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 - Task runner is `package.json` scripts only (`npm run check`, `npm run generate`). Node comes from `.node-version`. No mise, no Makefile.
 - The version source is `package.json`, the one file release-please bumps. Pi installs from npm and needs the `pi-package` keyword and a `pi.skills` entry.
 - Helper scripts (release guard, repository check) are dependency-free `.mjs` files.
-- All ai-rulez lint rules are on by default. A repo opts out per rule with a stated reason (scoop turns off `AR401` and `AR402` because its skills cite files of the bucket they operate on).
+- All ai-rulez lint rules are on by default. A repo opts out per rule with a stated reason (scoop turns off `AR401` and `AR402` because its skills cite files of the bucket they operate on). The template itself turns off `AR9T0` (root-component-shipped), because the Antigravity adapter has to be the root `plugin.json`. With codex-cli 0.162.1 that file is ignored when it declares the Antigravity `$schema` (Codex uses `.codex-plugin/plugin.json`), but a root `plugin.json` declaring the portable agent-plugins.org `$schema` is adopted as Codex's manifest, so the adapter must keep the Antigravity one.
 
 ## CI and release
 

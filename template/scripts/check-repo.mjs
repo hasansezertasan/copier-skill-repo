@@ -10,7 +10,12 @@
 // duplicate keys, multiple documents and inconsistent indentation are errors.
 // Block scalars (`run: |`) are skipped. Rules enforced:
 //   - top-level `permissions: {}` and a scoped `permissions` on every job;
-//   - every step's and job's `uses:` pinned by commit SHA (`./` is exempt).
+//   - every step's and job's `uses:` pinned by commit SHA (`./` is exempt);
+//   - where the generated Claude manifest exists, the Antigravity adapter (the
+//     root `plugin.json`) exists, declares the Antigravity `$schema` and carries
+//     the same `name` and `description`. (Codex adopts a root plugin.json that
+//     declares the portable agent-plugins.org schema as its own manifest.)
+//     The template repository, which has no generated output, is skipped.
 // Scanned: `.github/workflows` and `action.yml`/`action.yaml` under
 // `.github/actions`. Local actions elsewhere are not followed.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -223,6 +228,42 @@ for (const path of workflows) {
 for (const path of yamlFiles(".github/actions", /^action\.ya?ml$/)) {
   if (!isFile(path)) problems.push(`${path}: not a readable file`);
   else checkSteps(path, child(child(readTree(path), "runs"), "steps"));
+}
+
+const ANTIGRAVITY_SCHEMA = "https://antigravity.google/schemas/v1/plugin.json";
+
+// Antigravity installs straight from the Git URL, so nothing generates its
+// adapter. Keep its identity equal to the generated Claude manifest.
+const readManifest = (path) => {
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    problems.push(`${path}: cannot read as JSON (${error.code ?? error.name})`);
+    return undefined;
+  }
+  // Valid but falsy or non-object JSON (`null`, `0`, `[]`) is not a manifest.
+  if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) {
+    problems.push(`${path}: must be a JSON object`);
+    return undefined;
+  }
+  return manifest;
+};
+if (isFile(".claude-plugin/plugin.json")) {
+  const claude = readManifest(".claude-plugin/plugin.json");
+  const adapter = readManifest("plugin.json");
+  if (adapter && adapter.$schema !== ANTIGRAVITY_SCHEMA) {
+    problems.push(`plugin.json: $schema ${JSON.stringify(adapter.$schema)} must be ${ANTIGRAVITY_SCHEMA}`);
+  }
+  if (adapter && claude) {
+    for (const field of ["name", "description"]) {
+      if (adapter[field] !== claude[field]) {
+        problems.push(
+          `plugin.json: ${field} ${JSON.stringify(adapter[field])} does not match .claude-plugin/plugin.json ${JSON.stringify(claude[field])}`,
+        );
+      }
+    }
+  }
 }
 
 if (problems.length > 0) {
