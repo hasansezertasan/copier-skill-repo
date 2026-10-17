@@ -1057,8 +1057,22 @@ describe("four runtimes", () => {
       });
     }
 
-    test("keeps the Antigravity $schema, which Codex ignores, not the portable one it adopts", () => {
-      assert.equal(readJson(repo, adapter).$schema, "https://antigravity.google/schemas/v1/plugin.json");
+    // Codex adopts a root plugin.json that declares the portable schema as its
+    // manifest, so the check must hold the adapter to the Antigravity one.
+    for (const schema of ["https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", "", "https://example.com/other.json"]) {
+      test(`fails the check when the adapter declares $schema ${JSON.stringify(schema)}`, () => {
+        drift(
+          (text) => text.replace("https://antigravity.google/schemas/v1/plugin.json", schema),
+          /plugin\.json: \$schema .* must be https:\/\/antigravity\.google\/schemas\/v1\/plugin\.json/,
+        );
+      });
+    }
+
+    test("fails the check when the adapter has no $schema", () => {
+      drift(
+        (text) => text.replace(/\s*"\$schema": "[^"]*",/, ""),
+        /plugin\.json: \$schema undefined must be https:\/\/antigravity\.google\/schemas\/v1\/plugin\.json/,
+      );
     });
 
     test("fails the check when the adapter is not readable JSON", () => {

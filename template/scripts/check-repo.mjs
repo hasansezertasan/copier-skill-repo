@@ -12,7 +12,9 @@
 //   - top-level `permissions: {}` and a scoped `permissions` on every job;
 //   - every step's and job's `uses:` pinned by commit SHA (`./` is exempt);
 //   - where the generated Claude manifest exists, the Antigravity adapter (the
-//     root `plugin.json`) exists and carries the same `name` and `description`.
+//     root `plugin.json`) exists, declares the Antigravity `$schema` and carries
+//     the same `name` and `description`. (Codex adopts a root plugin.json that
+//     declares the portable agent-plugins.org schema as its own manifest.)
 //     The template repository, which has no generated output, is skipped.
 // Scanned: `.github/workflows` and `action.yml`/`action.yaml` under
 // `.github/actions`. Local actions elsewhere are not followed.
@@ -228,6 +230,8 @@ for (const path of yamlFiles(".github/actions", /^action\.ya?ml$/)) {
   else checkSteps(path, child(child(readTree(path), "runs"), "steps"));
 }
 
+const ANTIGRAVITY_SCHEMA = "https://antigravity.google/schemas/v1/plugin.json";
+
 // Antigravity installs straight from the Git URL, so nothing generates its
 // adapter. Keep its identity equal to the generated Claude manifest.
 const readManifest = (path) => {
@@ -248,6 +252,9 @@ const readManifest = (path) => {
 if (isFile(".claude-plugin/plugin.json")) {
   const claude = readManifest(".claude-plugin/plugin.json");
   const adapter = readManifest("plugin.json");
+  if (adapter && adapter.$schema !== ANTIGRAVITY_SCHEMA) {
+    problems.push(`plugin.json: $schema ${JSON.stringify(adapter.$schema)} must be ${ANTIGRAVITY_SCHEMA}`);
+  }
   if (adapter && claude) {
     for (const field of ["name", "description"]) {
       if (adapter[field] !== claude[field]) {
