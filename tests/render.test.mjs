@@ -938,11 +938,14 @@ describe("four runtimes", () => {
       installAndCheck(repo);
     });
 
-    test("carries the Pi keyword and skills entry in package.json", () => {
+    test("derives the Pi keyword, skills entry and files allowlist from the skills on disk", () => {
       const pkg = readJson(repo, "package.json");
       assert.deepEqual(pkg.keywords, ["alpha", "beta", "pi-package"]);
-      assert.deepEqual(pkg.pi, { skills: ["./skills"] });
+      assert.deepEqual(pkg.pi.skills, ["./skills/hello"]);
+      assert.ok(pkg.files.includes("skills/hello/SKILL.md"), "the published files list the skill");
       assert.ok(existsSync(join(repo, "skills/hello/SKILL.md")), "the Pi skills path exists");
+      assert.equal(pkg.scripts.check.startsWith("node scripts/check-repo.mjs"), true, "authored scripts survive the merge");
+      assert.ok(pkg.devDependencies["ai-rulez"], "authored devDependencies survive the merge");
     });
 
     test("documents all five runtimes and the open OpenCode question", () => {

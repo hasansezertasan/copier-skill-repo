@@ -32,7 +32,7 @@ version_from = "package.json"
 description = {{ q(description) }}
 repository = "{{ repo_url }}"
 keywords = [{% for keyword in keywords_json %}{{ q(keyword) }}{% if not loop.last %}, {% endif %}{% endfor %}]
-runtimes = ["claude", "codex"]
+runtimes = ["claude", "codex", "pi"]
 category = "Productivity"
 content_root = ".ai-rulez"
 provenance_headers = false
@@ -53,6 +53,13 @@ developer_name = {{ q(author_name) }}
 # Single-plugin catalogs point at the repository root ("./").
 [plugin.codex]
 marketplace = true
+
+# Pi reads the root skills/ tree. ai-rulez derives the `pi` entry, the
+# `pi-package` keyword and the `files` allowlist in package.json from the skills
+# on disk; merge keeps the authored fields there (scripts, devDependencies).
+[plugin.pi]
+skills_dir = "skills"
+package_json = "merge"
 
 [marketplace]
 name = "{{ repo_name }}"
