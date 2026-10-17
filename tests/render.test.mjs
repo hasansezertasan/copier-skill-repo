@@ -965,6 +965,7 @@ describe("runtimes", () => {
       assert.deepEqual(pkg.keywords, ["alpha", "beta", "pi-package"]);
       assert.deepEqual(pkg.pi.skills, ["./skills/hello"]);
       assert.ok(pkg.files.includes("skills/hello/SKILL.md"), "the published files list the skill");
+      assert.ok(!pkg.files.includes("docs/installation.md"), "the published files exclude unrelated repository files");
       assert.ok(existsSync(join(repo, "skills/hello/SKILL.md")), "the Pi skills path exists");
       assert.equal(pkg.scripts.check.startsWith("node scripts/check-repo.mjs"), true, "authored scripts survive the merge");
       assert.ok(pkg.devDependencies["ai-rulez"], "authored devDependencies survive the merge");
