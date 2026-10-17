@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/hasansezertasan/copier-skills/compare/v0.1.1...v0.1.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* anchor the patch allowlist and clear the index before staging ([#34](https://github.com/hasansezertasan/copier-skills/issues/34)) ([7100448](https://github.com/hasansezertasan/copier-skills/commit/7100448a18daae7b750b7e085c0b9e4684f1d50e))
+* declare the Node minimum the locked ai-rulez needs ([#36](https://github.com/hasansezertasan/copier-skills/issues/36)) ([51acc2e](https://github.com/hasansezertasan/copier-skills/commit/51acc2e0e4572d293966933ea5de0ca4a174a656))
+
 ## [0.1.1](https://github.com/hasansezertasan/copier-skills/compare/v0.1.0...v0.1.1) (2026-10-16)
 
 
