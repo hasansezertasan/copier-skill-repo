@@ -10,7 +10,9 @@
 // duplicate keys, multiple documents and inconsistent indentation are errors.
 // Block scalars (`run: |`) are skipped. Rules enforced:
 //   - top-level `permissions: {}` and a scoped `permissions` on every job;
-//   - every step's and job's `uses:` pinned by commit SHA (`./` is exempt).
+//   - every step's and job's `uses:` pinned by commit SHA (`./` is exempt);
+//   - the Antigravity adapter, the hand-maintained root `plugin.json`, carries
+//     the same `name` and `description` as the generated Claude manifest.
 // Scanned: `.github/workflows` and `action.yml`/`action.yaml` under
 // `.github/actions`. Local actions elsewhere are not followed.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -223,6 +225,28 @@ for (const path of workflows) {
 for (const path of yamlFiles(".github/actions", /^action\.ya?ml$/)) {
   if (!isFile(path)) problems.push(`${path}: not a readable file`);
   else checkSteps(path, child(child(readTree(path), "runs"), "steps"));
+}
+
+// Antigravity installs straight from the Git URL, so nothing generates its
+// adapter. Keep its identity equal to the generated Claude manifest.
+const readManifest = (path) => {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    problems.push(`${path}: cannot read as JSON (${error.code ?? error.name})`);
+    return undefined;
+  }
+};
+const adapter = readManifest("plugin.json");
+const claude = readManifest(".claude-plugin/plugin.json");
+if (adapter && claude) {
+  for (const field of ["name", "description"]) {
+    if (adapter[field] !== claude[field]) {
+      problems.push(
+        `plugin.json: ${field} ${JSON.stringify(adapter[field])} does not match .claude-plugin/plugin.json ${JSON.stringify(claude[field])}`,
+      );
+    }
+  }
 }
 
 if (problems.length > 0) {

@@ -945,7 +945,7 @@ describe("four runtimes", () => {
       assert.ok(existsSync(join(repo, "skills/hello/SKILL.md")), "the Pi skills path exists");
     });
 
-    test("documents all four runtimes and the open OpenCode question", () => {
+    test("documents all five runtimes and the open OpenCode question", () => {
       const doc = read(repo, "docs/installation.md");
       assert.match(doc, /claude plugin marketplace add acme\/demo-skills/);
       assert.match(doc, /codex plugin marketplace add/);
@@ -960,10 +960,13 @@ describe("four runtimes", () => {
       assert.match(doc, /Install the demo-skills skills: pick the best installation method for\nyou from https:\/\/github\.com\/acme\/demo-skills\/blob\/main\/docs\/installation\.md/);
       assert.match(doc, /^## For agents reading this page$/m);
       assert.match(doc, /^\| Runtime \| Install \| Update \| Confirm \|$/m);
-      for (const runtime of ["Claude Code", "Codex", "OpenCode", "Pi", "Manual"]) {
+      for (const runtime of ["Claude Code", "Codex", "OpenCode", "Pi", "Antigravity", "Manual"]) {
         assert.match(doc, new RegExp(`^\\| ${runtime} \\|`, "m"), `${runtime} row`);
       }
       assert.doesNotMatch(doc, /scoop/i, "no text borrowed from another repo");
+      assert.match(doc, /five runtimes/);
+      assert.match(doc, /agy plugin install https:\/\/github\.com\/acme\/demo-skills/);
+      assert.match(doc, /> \*\*Unverified\.\*\* Only `agy plugin validate`/);
       // Caveats that must survive: copied skills are verified, not just the
       // clone, and the Codex update route is flagged as unverified.
       // Per skill: a plain `diff -r` of the two directories would also report
@@ -983,6 +986,48 @@ describe("four runtimes", () => {
       const readme = read(repo, "README.md");
       assert.match(readme, /^# Demo Skills$/m);
       assert.match(readme, /docs\/installation\.md/);
+    });
+  });
+
+  describe("the Antigravity adapter", () => {
+    const adapter = "plugin.json";
+    const check = (dir) => execFileSync("node", ["scripts/check-repo.mjs"], { cwd: dir, stdio: "pipe", timeout: FIVE_MINUTES });
+    const failsWith = (pattern) => (error) =>
+      error.status === 1 && !/\n\s+at .*:\d+:\d+/.test(String(error.stderr)) && pattern.test(String(error.stderr));
+    let repo;
+    before(() => {
+      repo = render({ repo_name: "demo-skills", description: 'Skills "quoted" with 😀 and a \\ backslash.' });
+    });
+    // Runs `change` on the adapter, expects the check to fail, then restores it.
+    const drift = (change, pattern) => {
+      const original = readFileSync(join(repo, adapter), "utf8");
+      try {
+        writeFileSync(join(repo, adapter), change(original));
+        assert.throws(() => check(repo), failsWith(pattern));
+      } finally {
+        writeFileSync(join(repo, adapter), original);
+      }
+    };
+
+    test("is a root plugin.json built from the answers", () => {
+      assert.deepEqual(readJson(repo, adapter), {
+        $schema: "https://antigravity.google/schemas/v1/plugin.json",
+        name: "demo-skills",
+        description: 'Skills "quoted" with 😀 and a \\ backslash.',
+      });
+      check(repo);
+    });
+
+    test("fails the check when the description drifts from the generated manifest", () => {
+      drift((text) => text.replace("quoted", "changed"), /plugin\.json: description .* does not match \.claude-plugin\/plugin\.json/);
+    });
+
+    test("fails the check when the name drifts", () => {
+      drift((text) => text.replace('"demo-skills"', '"other-skills"'), /plugin\.json: name "other-skills" does not match/);
+    });
+
+    test("fails the check when the adapter is not readable JSON", () => {
+      drift(() => "{ not json", /plugin\.json: cannot read as JSON/);
     });
   });
 
