@@ -5,7 +5,8 @@ _answers_file: .copier-answers.yml
 # The manifest holds the released version, which release-please owns, so
 # adopting or updating must not reset it to the template's 0.0.0. Every other
 # scaffold file is three-way merged, and `version` in package.json merges as a
-# local edit. Skills are deliberately not listed: a skip pattern makes Copier
+# local edit. package.json is rendered in the exact form ai-rulez rewrites it to
+# (sorted keys, derived Pi fields), so it merges cleanly despite the generator. Skills are deliberately not listed: a skip pattern makes Copier
 # recreate a deleted placeholder skill on every update, while the merge leaves
 # a deleted or rewritten placeholder alone and never touches the repo's own skills.
 _skip_if_exists:

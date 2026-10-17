@@ -56,7 +56,8 @@ marketplace = true
 
 # Pi reads the root skills/ tree. ai-rulez derives the `pi` entry, the
 # `pi-package` keyword and the `files` allowlist in package.json from the skills
-# on disk; merge keeps the authored fields there (scripts, devDependencies).
+# on disk and rewrites the whole file (sorted keys, expanded arrays), keeping
+# the authored fields (scripts, devDependencies). Edit those, not the derived ones.
 [plugin.pi]
 skills_dir = "skills"
 package_json = "merge"
