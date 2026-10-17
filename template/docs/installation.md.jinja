@@ -18,8 +18,8 @@ You were pointed here to install the skills. Do this:
 1. Pick the route in the table below that you can run yourself on your platform. Prefer a route native to your runtime over a manual clone.
 2. If a route needs a slash command or an interactive step you cannot run, give the user the exact command and ask them to run it. Do not guess at another command.
 3. Confirm the install with the route's confirm step.
-4. Plugin and skills installs usually load in a new session, not in the conversation that installed them. If the skills are not available to you now, read `skills/<name>/SKILL.md` from a clone of this repository (a temporary clone is fine) and tell the user to start a new session so the installed skills load next time.
-5. If a route fails, fall back to the manual route. Do not report the install as done until you have confirmed the skills or read a `SKILL.md`.
+4. Plugin and skills installs usually load in a new session, not in the conversation that installed them. If the skills are not available to you now, you may read `skills/<name>/SKILL.md` from a clone of this repository (a temporary clone is fine) to do the user's task in this conversation, and tell the user to start a new session so the installed skills load next time. Reading a clone is not an install: it registers nothing for later sessions.
+5. If a route fails, fall back to the manual route. Report the install as done only after the route's confirm step succeeds. Never report it as done because you read a `SKILL.md` from a clone.
 6. Do not install other agent skills or switch to a different route unless this one fails.
 
 ## Routes
@@ -35,7 +35,7 @@ You were pointed here to install the skills. Do this:
 | Pi | `pi install git:github.com/{{ github_owner }}/{{ repo_name }}` (not published to npm) | `pi update git:github.com/{{ github_owner }}/{{ repo_name }}` (a bare `pi update` updates Pi itself), then restart Pi or reload resources | invoke one of the skills with `/skill:<name>` |
 {%- endif %}
 | Antigravity | git only; see [Antigravity](#antigravity) | reinstall with the same command, then restart | `agy plugin list` shows the plugin as installed and enabled; restart Antigravity to load it |
-| Manual | clone this repository and read `skills/<name>/SKILL.md`, or copy `skills/*` into your agent's skills directory | `git pull` in the clone, then copy `skills/*` again if you copied them | the clone's `git rev-parse HEAD` matches the latest commit on `main`; if you copied the skills, `for d in <clone>/skills/*/; do diff -r "$d" "<destination>/$(basename "$d")"; done` prints nothing (compare skill by skill: the destination may hold skills from other sources) |
+| Manual | clone this repository, then copy `skills/*` into your agent's skills directory (reading `skills/<name>/SKILL.md` from the clone only lets you use the skills in the current conversation; it is not an install) | `git pull` in the clone, then copy `skills/*` again | `for d in <clone>/skills/*/; do diff -r "$d" "<destination>/$(basename "$d")"; done` prints nothing (compare skill by skill: the destination may hold skills from other sources) |
 
 The Pi package declares the `pi-package` keyword and a `pi.skills` entry per skill in `package.json`, written by `npm run generate`. To compare an installed version with the latest, use the version in `.claude-plugin/plugin.json` or the repository's latest GitHub release.
 
@@ -49,7 +49,7 @@ mkdir -p ~/.agents/skills
 for skill in {{ repo_name }}/skills/*/; do ln -s "$PWD/${skill%/}" ~/.agents/skills/; done
 ```
 
-Alternatively, add the clone's `skills/` directory to OpenCode's configuration:
+Alternatively, add the clone's `skills/` directory to OpenCode's configuration. The `skills` array comes from OpenCode's published config schema, which marks the older object form (with a `paths` key) deprecated; OpenCode's documentation pages do not describe this option, so it is unverified in practice:
 
 ```json
 {
