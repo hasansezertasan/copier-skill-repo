@@ -17,8 +17,9 @@
 //     declares the portable agent-plugins.org schema as its own manifest.)
 //     The template repository, which has no generated output, is skipped.
 //   - no host-loaded component at the repository root (`.mcp.json`, `hooks/`,
-//     ...): both catalogs install the root, so the host would ship it. ai-rulez
-//     reports these as AR9T0, a rule the template turns off for the adapter.
+//     ...), anywhere this runs: both catalogs install the root, so the host
+//     would ship it. ai-rulez reports these as AR9T0, a rule the template turns
+//     off for the adapter.
 // Scanned: `.github/workflows` and `action.yml`/`action.yaml` under
 // `.github/actions`. Local actions elsewhere are not followed.
 import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -280,8 +281,11 @@ if (isFile(".claude-plugin/plugin.json")) {
 
 // Paths Claude or Codex load from an installed plugin by default. `skills/` is
 // the intended payload, and `plugin.json` is the adapter checked above.
+// The list is ai-rulez 5.3.0's AR9T0 set, plus `agents` and `commands` from
+// Claude's standard plugin layout, which AR9T0 does not flag.
 const ROOT_COMPONENTS = [
   ".mcp.json",
+  ".app.json",
   ".lsp.json",
   "settings.json",
   "hooks",

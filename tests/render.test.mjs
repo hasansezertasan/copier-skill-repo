@@ -4,7 +4,7 @@
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1042,14 +1042,14 @@ describe("four runtimes", () => {
     // from an installed plugin by default would ship. ai-rulez reports these as
     // AR9T0, but the template turns that rule off for the adapter above.
     describe("host-loaded root components", () => {
-      const files = [".mcp.json", ".lsp.json", "settings.json"];
+      const files = [".mcp.json", ".app.json", ".lsp.json", "settings.json"];
       const directories = ["hooks", "agents", "commands", "bin", "output-styles", "workflows", "themes", "monitors"];
       // Creates `path` in the rendered repo, expects the check to name it, then removes it.
       const shipping = (path, make) => {
         const full = join(repo, path);
         make(full);
         try {
-          assert.throws(() => check(repo), failsWith(new RegExp(`root component: ${path.replace(".", "\\.")}`)));
+          assert.throws(() => check(repo), failsWith(new RegExp(`root component: ${path.replaceAll(".", "\\.")}`)));
         } finally {
           rmSync(full, { recursive: true, force: true });
         }
@@ -1060,6 +1060,10 @@ describe("four runtimes", () => {
       for (const path of directories) {
         test(`fails the check when ${path}/ exists at the root, even empty`, () => shipping(path, (full) => mkdirSync(full)));
       }
+
+      test("fails the check on a dangling symlink at a root component path", () => {
+        shipping("hooks", (full) => symlinkSync(join(full, "..", "no-such-target"), full));
+      });
 
       test("names every offending path in one run", () => {
         writeFileSync(join(repo, ".mcp.json"), "{}\n");
