@@ -8,11 +8,11 @@ Across the three adoptions and the update, these repeated: deriving the answers 
 
 ## Decision
 
-Add no skills yet. Keep the one-time setup checklist in the template's `CONTRIBUTING.md` and record the recipe in `docs/adopting.md`. Revisit after infra-copilot is adopted and `gitops-skills` exists, which are the only remaining adoption and the only planned new repo.
+Add no skills yet. Keep the one-time setup checklist in the template's `CONTRIBUTING.md` and record the recipe in `docs/adopting.md`. Revisit after infra-copilot is adopted and both planned new repos exist: `gitops-skills`, and the skill repo about Copier templates that ADR 0002 reserved the name `copier-skills` for (its name and starting version are open, because GitHub blocks that name's legacy immutable release tags).
 
 ## Why
 
-- **Cost against use.** One adoption and one new repo remain. A skill needs a spec, evals and upkeep alongside the template.
+- **Cost against use.** One adoption remains, and the two planned new repos are `gitops-skills` and the Copier skill repo. A skill needs a spec, evals and upkeep alongside the template.
 - **Most repetition was template defects.** The README skeleton conflicting with every adopter's README, the version reset, the `AR9T0` gap (fixed in v0.3.0) and the installation-page gaps each cost steps that fixing the template removes. Automating them would have hidden the defects.
 - **The steps that need judgment stay manual either way:** what to keep in the config, which differences are deliberate, and what each ADR says.
 
@@ -25,5 +25,5 @@ Add no skills yet. Keep the one-time setup checklist in the template's `CONTRIBU
 
 ## Consequences
 
-- Revisit trigger: infra-copilot adopted and `gitops-skills` created, or a fifth repo asking for the same steps.
-- If skills are added later, they belong in the new skill repo, so this decision connects to its name and starting version.
+- Revisit trigger: infra-copilot adopted and both planned new repos created (`gitops-skills` and the Copier skill repo from ADR 0002), or a fifth repo asking for the same steps.
+- If skills are added later, they belong in that Copier skill repo, so this decision connects to its name and starting version; it does not supersede ADR 0002's plan to create it.
