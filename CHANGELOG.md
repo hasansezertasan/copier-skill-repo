@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.4.0...v0.4.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* regenerate commands and Pi prompts on the release PR and keep tags plain ([#53](https://github.com/hasansezertasan/copier-skill-repo/issues/53)) ([2742f0e](https://github.com/hasansezertasan/copier-skill-repo/commit/2742f0e996e5f64c667341c1e86c47577404e410))
+
 ## [0.4.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.3.0...v0.4.0) (2026-10-17)
 
 
