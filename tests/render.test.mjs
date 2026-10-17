@@ -869,6 +869,7 @@ describe("copier update", () => {
     // The template moves on: it changes template-owned and repo-owned files alike.
     edit(source, "template/CONTRIBUTING.md.jinja", "## Commits and pull requests", "## Commits and pull requests\n\n> Template note.");
     edit(source, "template/package.json.jinja", '"node": ">=22"', '"node": ">=24"');
+    edit(source, "template/package.json.jinja", '"ai-rulez": "5.3.0"', '"ai-rulez": "5.4.0"');
     edit(source, "template/.ai-rulez/skills/{{ placeholder_skill }}/SKILL.md.jinja", "Placeholder skill", "Template placeholder");
     edit(source, "template/.release-please-manifest.json", '"0.0.0"', '"0.0.1"');
     git(source, "add", "-A");
@@ -908,7 +909,10 @@ describe("copier update", () => {
     const contributing = read(repo, "CONTRIBUTING.md");
     assert.match(contributing, /Template note\./);
     assert.match(contributing, /Local rule: ask before merging\./);
-    assert.equal(readJson(repo, "package.json").engines.node, ">=24");
+    const pkg = readJson(repo, "package.json");
+    assert.equal(pkg.engines.node, ">=24");
+    assert.equal(pkg.devDependencies["ai-rulez"], "5.4.0");
+    assert.ok(!/<<<<<<<|>>>>>>>/.test(read(repo, "package.json")), "no conflict markers in package.json");
     assert.ok(!/<<<<<<<|>>>>>>>/.test(contributing), "no conflict markers");
   });
 
@@ -917,7 +921,27 @@ describe("copier update", () => {
   });
 });
 
-describe("four runtimes", () => {
+describe("package.json layout", () => {
+  // `copier update` three-way merges package.json, so a fresh render must
+  // already have the layout `npm run generate` leaves, or every template edit
+  // to the file conflicts with the committed, generated one.
+  for (const answers of [
+    { keywords: "beta, alpha" },
+    { keywords: "pi-package, alpha" },
+    { publish_to_npm: false },
+    // Characters tojson would escape and ai-rulez writes literally.
+    { description: "Rock & roll <b> \"quoted\" back\\slash \u00e9 \u{1F600}", author_name: "A & B \u{1F600}", keywords: "r&b, \u{1F600}" },
+  ]) {
+    test(`is unchanged by generation for ${JSON.stringify(answers)}`, () => {
+      const data = { repo_name: "demo-skills", description: "Demo.", ...answers };
+      const unGenerated = readFileSync(join(render(data, "demo-skills", ["--skip-tasks"]), "package.json"), "utf8");
+      const generated = readFileSync(join(render(data, "demo-skills"), "package.json"), "utf8");
+      assert.equal(unGenerated, generated);
+    });
+  }
+});
+
+describe("runtimes", () => {
   const read = (repo, path) => readFileSync(join(repo, path), "utf8");
 
   describe("by default", () => {
@@ -938,11 +962,15 @@ describe("four runtimes", () => {
       installAndCheck(repo);
     });
 
-    test("carries the Pi keyword and skills entry in package.json", () => {
+    test("derives the Pi keyword, skills entry and files allowlist from the skills on disk", () => {
       const pkg = readJson(repo, "package.json");
       assert.deepEqual(pkg.keywords, ["alpha", "beta", "pi-package"]);
-      assert.deepEqual(pkg.pi, { skills: ["./skills"] });
+      assert.deepEqual(pkg.pi.skills, ["./skills/hello"]);
+      assert.ok(pkg.files.includes("skills/hello/SKILL.md"), "the published files list the skill");
+      assert.ok(!pkg.files.includes("docs/installation.md"), "the published files exclude unrelated repository files");
       assert.ok(existsSync(join(repo, "skills/hello/SKILL.md")), "the Pi skills path exists");
+      assert.equal(pkg.scripts.check.startsWith("node scripts/check-repo.mjs"), true, "authored scripts survive the merge");
+      assert.ok(pkg.devDependencies["ai-rulez"], "authored devDependencies survive the merge");
     });
 
     test("documents all five runtimes and the open OpenCode question", () => {
