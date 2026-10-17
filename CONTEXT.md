@@ -1,4 +1,4 @@
-# copier-skills
+# copier-skill-repo
 
 A Copier template that generates the shared scaffold of skill repos: repositories that publish agent skills as plugins to several runtimes. It owns the scaffold, never the skills' content.
 

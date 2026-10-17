@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `hasansezertasan/copier-skills` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `hasansezertasan/copier-skill-repo` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
