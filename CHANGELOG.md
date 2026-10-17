@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.4.1...v0.4.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* stop running every check twice and check the committed release tree ([#55](https://github.com/hasansezertasan/copier-skill-repo/issues/55)) ([d0df23a](https://github.com/hasansezertasan/copier-skill-repo/commit/d0df23a6cbd6924a60cda6730d8b86c932571bce))
+
 ## [0.4.1](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.4.0...v0.4.1) (2026-10-17)
 
 
