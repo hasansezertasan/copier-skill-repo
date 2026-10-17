@@ -1,3 +1,10 @@
+{#- JSON string with the escaping ai-rulez writes back: only the backslash and
+    the quote, everything else literal UTF-8. Not `tojson`, which HTML-escapes
+    `&`, `<` and `>` and splits emoji into surrogate pairs. The answers'
+    validators already reject control characters. -#}
+{%- macro j(value) -%}
+"{{ value | replace('\\', '\\\\') | replace('"', '\\"') }}"
+{%- endmacro -%}
 {#- Written in the exact form `ai-rulez generate --plugin` leaves it (sorted keys,
     expanded arrays, the derived Pi fields), so a repo's committed file and a
     fresh render share one layout and `copier update` merges edits cleanly. The
@@ -5,10 +12,10 @@
     skills on disk. -#}
 {
   "author": {
-    "name": {{ author_name | tojson }},
-    "url": {{ author_url | tojson }}
+    "name": {{ j(author_name) }},
+    "url": {{ j(author_url) }}
   },
-  "description": {{ description | tojson }},
+  "description": {{ j(description) }},
   "devDependencies": {
     "ai-rulez": "5.3.0"
   },
@@ -21,7 +28,7 @@
   ],
   "keywords": [
 {%- for keyword in (keywords_json + ["pi-package"]) | unique | list %}
-    {{ keyword | tojson }}{% if not loop.last %},{% endif %}
+    {{ j(keyword) }}{% if not loop.last %},{% endif %}
 {%- endfor %}
   ],
   "license": "{{ license }}",

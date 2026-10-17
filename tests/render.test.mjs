@@ -929,6 +929,8 @@ describe("package.json layout", () => {
     { keywords: "beta, alpha" },
     { keywords: "pi-package, alpha" },
     { publish_to_npm: false },
+    // Characters tojson would escape and ai-rulez writes literally.
+    { description: "Rock & roll <b> \"quoted\" back\\slash \u00e9 \u{1F600}", author_name: "A & B \u{1F600}", keywords: "r&b, \u{1F600}" },
   ]) {
     test(`is unchanged by generation for ${JSON.stringify(answers)}`, () => {
       const data = { repo_name: "demo-skills", description: "Demo.", ...answers };
