@@ -27,6 +27,8 @@ Each adoption is one PR in the adopting repo, pinned at a release tag, with an A
 
 `copier update --trust --vcs-ref vX.Y.Z` in a fresh branch. Expect conflicts in `README.md` (keep the repo's), `.ai-rulez/config.toml` (merge into the existing `[lint.severity]` table), `CONTRIBUTING.md` and `docs/installation.md` (keep both sides). Regenerate with `npm run generate` after resolving, and check that `skills/` and the manifests do not change unless the template meant them to.
 
+Resolve `.ai-rulez/config.toml` first and keep the repo's `shared_resources`. The template's `_tasks` run `npm run generate` during the update, and generating without `shared_resources` rewrites every skill: each `SKILL.md` changes and the per-skill `references/` copies are deleted (seen in scoop-bucket-skills#24, where the links in six skill files changed). If `skills/` drifts during an update, restore the setting and run `npm run generate` again before committing.
+
 ## Known gaps
 
 - The template renders a README skeleton, so `copier update` conflicts on every adopter's own README whenever the skeleton changes.
