@@ -1,6 +1,0 @@
-# Tools for this repo's own tests and CI (the template ships none of this).
-# Renovate's mise manager reads the pins here.
-[tools]
-node = "24"
-uv = "0.13.1"
-copier = "9.18.2"

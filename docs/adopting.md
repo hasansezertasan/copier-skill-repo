@@ -8,8 +8,8 @@ Each adoption is one PR in the adopting repo, pinned at a release tag, with an A
 
 1. **Branch** off the repo's default branch (`feature/adopt-copier-skill-repo-template`).
 2. **Derive the answers** from the files the repo already has: `repo_name` and `description` from `.ai-rulez/config.toml` or `package.json`, `keywords` from the same (include `pi-package` only if the existing manifests carry it, so the generated manifests do not change), `publish_to_npm: false` unless the repo publishes, `license` from its `LICENSE`. Put them in a JSON file.
-3. **Render over the repo, tasks skipped, at a release tag:**
-   `copier copy --trust --overwrite --defaults --skip-tasks --vcs-ref vX.Y.Z --data-file answers.json https://github.com/hasansezertasan/copier-skill-repo .`
+3. **Render over the repo at a release tag:**
+   `copier copy --overwrite --defaults --vcs-ref vX.Y.Z --data-file answers.json https://github.com/hasansezertasan/copier-skill-repo .`
 4. **Undo what the render clobbers.**
    - Restore `README.md` (`git checkout README.md`), then change only its development commands.
    - Delete the placeholder skill (`.ai-rulez/skills/<placeholder_skill>/`).
@@ -19,17 +19,25 @@ Each adoption is one PR in the adopting repo, pinned at a release tag, with an A
 7. **Keep what the template does not ship.** A root `hooks/`, `agents/`, `commands/` or other host-loaded component the repo ships on purpose goes in `.config/root-components.json` as `{"<component>": "<reason>"}`, and the ADR repeats the reasons. The repo's own unit tests run through `npm test` and one extra step in `check.yml`; an eval task becomes `npm run eval`. Keep `check.yml` otherwise as rendered, with every action pinned by SHA.
 8. **Layer repo content** onto `CONTRIBUTING.md` (a "<Repo> development" section before "Skill layout") and `docs/installation.md` (the install prompt and "Then use it" table). Both are template-owned and merge on `copier update`.
 9. **Fix stale references:** `grep` for the old commands (`mise run`, `make`, `pyproject.toml`, the old guard) outside the skills, which may legitimately cite the commands of the repo they operate on. Update `docs/host-support.md` to list Pi and Antigravity as not evaluated.
-10. **Run the install and generate tasks**, then `npm run generate`, `npm run check` and `npm test`. Check again on the committed tree: `AR961` plugin-version drift fails the check while generated output differs from `HEAD`, and clears once committed.
+10. **Run `npm install`, `npm run generate`**, then `npm run check` and `npm test`. Check again on the committed tree: `AR961` plugin-version drift fails the check while generated output differs from `HEAD`, and clears once committed.
 11. **Write the ADR**, commit, push and open the PR. Review the diff before it is pushed; bots flag claims in docs that outrun the evidence recorded in `docs/host-support.md`.
 12. **After the merge:** change the required status check from `validate` to `check` in branch protection, close the repo's old Renovate PRs for tools that moved into `package.json`, and close the adoption ticket here.
 
 ## Updating an adopted repo
 
-`copier update --trust --skip-tasks --vcs-ref vX.Y.Z` in a fresh branch. Expect conflicts in `README.md` (keep the repo's), `.ai-rulez/config.toml` (merge into the existing `[lint.severity]` table), `CONTRIBUTING.md` and `docs/installation.md` (keep both sides).
+`copier update --vcs-ref vX.Y.Z` in a fresh branch. Expect conflicts in `README.md` (keep the repo's), `.ai-rulez/config.toml` (merge into the existing `[lint.severity]` table), `CONTRIBUTING.md` and `docs/installation.md` (keep both sides).
 
-Skip the tasks. The template's `_tasks` run `npm install` and `npm run generate` inside the update, before you can resolve the conflicts, and generating without the repo's `shared_resources` rewrites every skill: each `SKILL.md` changes and the per-skill `references/` copies are deleted (seen in scoop-bucket-skills#24, where the links in six skill files changed). So resolve `.ai-rulez/config.toml` first, keeping the repo's `shared_resources`, then run `npm install` and `npm run generate` yourself and check that `skills/` and the manifests do not change unless the template meant them to. If `skills/` drifts, restore the setting and run `npm run generate` again before committing.
+Copier does not generate for you (ADR 0004). Generating before you resolve the conflicts, without the repo's `shared_resources`, rewrites every skill: each `SKILL.md` changes and the per-skill `references/` copies are deleted (seen in scoop-bucket-skills#24, where the links in six skill files changed). So resolve `.ai-rulez/config.toml` first, keeping the repo's `shared_resources`, then run `npm install` and `npm run generate` yourself and check that `skills/` and the manifests do not change unless the template meant them to. If `skills/` drifts, restore the setting and run `npm run generate` again before committing.
 
 ## Known gaps
 
 - The template renders a README skeleton, so `copier update` conflicts on every adopter's own README whenever the skeleton changes.
 - Nothing automates steps 2 to 9.
+
+## Updating this repo from copier-copier
+
+This repo adopts copier-copier v0.1.0 selectively (ADR 0004 records the adaptation, #62 the adoption). Its `_skip_if_exists` only protects files that already exist, so every `copier update` against copier-copier recreates two files this repo deliberately does not carry. Delete them before committing:
+
+`template/PLACEHOLDER.md`, `template/.copier-answers.yml.jinja`.
+
+Both would ship into every generated repo (the second renders the same `.copier-answers.yml` as the template's own answers file), so never commit them. Every other file in the update should merge or stay unchanged; anything else is a real template change to review.

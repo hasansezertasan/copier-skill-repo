@@ -6,22 +6,29 @@ on:
   push:
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 permissions: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Installs node, uv and copier as pinned in mise.toml.
-      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+      # Installs node, python and uv as pinned in .config/mise.toml.
+      - name: Install mise
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
       # The template's own hardening rules also apply to this repo's workflows.
-      - run: node template/scripts/check-repo.mjs
-      # Renders every matrix entry (defaults, publish off, non-default placeholder
-      # skill) and runs the update test; any failure fails the job.
-      - run: npm test
+      - name: Check the workflows
+        run: node template/scripts/check-repo.mjs
+      # The pytest suite in tests/ renders every answer set it covers (defaults,
+      # publish off, non-default answers, rejected answers) and runs the update
+      # tests; any failure fails the job.
+      - name: Run the tests
+        run: mise run test

@@ -13,10 +13,25 @@ _skip_if_exists:
   - .release-please-manifest.json
 
 # Generated output (skills/, plugin manifests, marketplace catalogs) is never
-# stored in the template: it is built here, right after rendering.
-_tasks:
-  - command: npm install
-  - command: npm run generate
+# stored in the template. It is built by `npm run generate`, which the message
+# below asks for. A message, not a task: `_tasks` would force --trust and stop
+# Renovate's copier manager from opening update PRs.
+_message_after_copy: |
+  {{ repo_name }} is rendered in {{ _copier_conf.dst_path }}.
+
+  Generated output (skills/, plugin and marketplace manifests) is not part of the
+  template. Build it, then commit the result:
+    cd "{{ _copier_conf.dst_path }}" && npm install && npm run generate
+
+  Run the same two commands after every `copier update`, once any conflicts
+  are resolved.
+
+_message_after_update: |
+  {{ repo_name }} is updated to template {{ _copier_answers._commit }}.
+
+  Resolve any conflicts, then regenerate the generated output (skills/, plugin
+  and marketplace manifests) and commit the result:
+    npm install && npm run generate
 
 repo_name:
   type: str
