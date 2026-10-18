@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.5.1...v0.6.0) (2026-10-18)
+
+
+### Features
+
+* add a skills.sh badge to the generated README ([#67](https://github.com/hasansezertasan/copier-skill-repo/issues/67)) ([a99d7e1](https://github.com/hasansezertasan/copier-skill-repo/commit/a99d7e182c5b8fbc21995f6837adb2438cfebcf8))
+
 ## [0.5.1](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.5.0...v0.5.1) (2026-10-18)
 
 
