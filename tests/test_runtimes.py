@@ -119,6 +119,10 @@ def test_ships_a_readme_skeleton_that_points_at_the_install_doc(repo: Path) -> N
     readme = read_text(repo / "README.md")
     assert re.search(r"^# Demo Skills$", readme, re.M)
     assert re.search(r"docs/installation\.md", readme)
+    assert re.search(
+        r"\[!\[skills\.sh\]\(https://skills\.sh/b/[^/]+/demo-skills\)\]\(https://skills\.sh/[^/]+/demo-skills\)",
+        readme,
+    )
 
 
 # the Antigravity adapter
