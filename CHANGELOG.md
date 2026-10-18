@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.4.2...v0.5.0) (2026-10-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* adopt the copier-copier scaffolding and drop _tasks ([#63](https://github.com/hasansezertasan/copier-skill-repo/issues/63))
+
+### Features
+
+* adopt the copier-copier scaffolding and drop _tasks ([#63](https://github.com/hasansezertasan/copier-skill-repo/issues/63)) ([dd324ab](https://github.com/hasansezertasan/copier-skill-repo/commit/dd324abe4afbc8dc2755ce3c4d2bf507ba05f545))
+
 ## [0.4.2](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.4.1...v0.4.2) (2026-10-17)
 
 
