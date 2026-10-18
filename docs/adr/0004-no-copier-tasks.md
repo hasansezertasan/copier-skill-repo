@@ -4,7 +4,7 @@ Decided 2026-10-18, while adopting the copier-copier scaffolding (#62). The temp
 
 ## Decision
 
-Remove `_tasks`. A `_message_after_copy` tells the user to run `npm install && npm run generate` after the render, and again after every `copier update` once conflicts are resolved. The template's own tests run the same two commands after copying.
+Remove `_tasks`. A `_message_after_copy` tells the user to run `npm install && npm run generate` after the render. A `_message_after_update` says the same after every `copier update`, once conflicts are resolved: Copier prints only `_message_after_copy` on copy, so without the second message update users would never see the instruction. The template's own tests run the same two commands after copying.
 
 ## Why
 
@@ -20,7 +20,7 @@ Remove `_tasks`. A `_message_after_copy` tells the user to run `npm install && n
 
 ## Adopting copier-copier
 
-Decided in the same change: this repo adopts copier-copier selectively (cobo files, `.config/mise.toml`, branch-name, PR-title and cobo-drift workflows, `LICENSE`, `.copier-answers.yml`) and moves release-please to the `simple` type with `.github/` config and `version.txt`. Python tooling is not adopted because the tests are Node. The cost is that `copier update` recreates six files it does not own a use for; `docs/adopting.md` lists them and says to delete them.
+Decided in the same change: this repo adopts copier-copier selectively (cobo files, `.config/mise.toml`, branch-name, PR-title and cobo-drift workflows, `LICENSE`, `.copier-answers.yml`) and moves release-please to the `simple` type with `.github/` config and `version.txt`. The Python tooling (`pyproject.toml`, `uv.lock`, pytest) is adopted too, and the tests are written in pytest, which drives the template through Copier's own interpreter. That leaves two files that `copier update` recreates and this repo must not carry; `docs/adopting.md` lists them and says to delete them.
 
 ## Considered Options
 

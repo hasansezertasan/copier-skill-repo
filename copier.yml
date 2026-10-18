@@ -26,6 +26,13 @@ _message_after_copy: |
   Run the same two commands after every `copier update`, once any conflicts
   are resolved.
 
+_message_after_update: |
+  {{ repo_name }} is updated to template {{ _copier_answers._commit }}.
+
+  Resolve any conflicts, then regenerate the generated output (skills/, plugin
+  and marketplace manifests) and commit the result:
+    npm install && npm run generate
+
 repo_name:
   type: str
   default: "{{ _copier_conf.dst_path.name }}"
