@@ -18,6 +18,10 @@ Remove `_tasks`. A `_message_after_copy` tells the user to run `npm install && n
 - `--trust` and `--skip-tasks` are no longer needed in any recipe.
 - Tests render, then generate explicitly; the `package.json` layout test renders without generating on purpose.
 
+## Adopting copier-copier
+
+Decided in the same change: this repo adopts copier-copier selectively (cobo files, `.config/mise.toml`, branch-name, PR-title and cobo-drift workflows, `LICENSE`, `.copier-answers.yml`) and moves release-please to the `simple` type with `.github/` config and `version.txt`. Python tooling is not adopted because the tests are Node. The cost is that `copier update` recreates six files it does not own a use for; `docs/adopting.md` lists them and says to delete them.
+
 ## Considered Options
 
 - **Keep `_tasks`.** Rejected for the two reasons above.
