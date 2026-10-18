@@ -1,15 +1,17 @@
 # Tools for this repo's own tests and CI (the template ships none of this).
 # Renovate's mise manager reads the pins here.
 [tools]
+# Python comes from .python-version (shared with uv and Renovate); PYTHON_VERSION overrides it.
+python = "{{ get_env(name='PYTHON_VERSION', default=read_file(path=config_root ~ '/.python-version') | trim) }}"
+# The tests render generated repos and run npm in them, so node stays.
 node = "24"
 uv = "0.13.1"
-copier = "9.18.2"
 # cobo generates the sealed boilerplate blocks (.gitignore, .gitattributes, .editorconfig).
 "pipx:cobo" = "0.6.0"
 
 [tasks.test]
 description = "Run the template test suite"
-run = "node --test \"tests/**/*.test.mjs\""
+run = "uv run pytest"
 
 [tasks.cobo-check]
 description = "Check cobo-managed files for drift from their upstream sources"

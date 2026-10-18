@@ -36,8 +36,8 @@ Copier does not generate for you (ADR 0004). Generating before you resolve the c
 
 ## Updating this repo from copier-copier
 
-This repo adopts copier-copier v0.1.0 selectively (ADR 0004 records the adaptation, #62 the adoption). Its `_skip_if_exists` only protects files that already exist, so every `copier update` against copier-copier recreates six files this repo deliberately does not carry. Delete them before committing:
+This repo adopts copier-copier v0.1.0 selectively (ADR 0004 records the adaptation, #62 the adoption). Its `_skip_if_exists` only protects files that already exist, so every `copier update` against copier-copier recreates two files this repo deliberately does not carry. Delete them before committing:
 
-`pyproject.toml`, `uv.lock`, `tests/conftest.py`, `tests/test_template.py`, `template/PLACEHOLDER.md`, `template/.copier-answers.yml.jinja`.
+`template/PLACEHOLDER.md`, `template/.copier-answers.yml.jinja`.
 
-The last two would ship into every generated repo (the second renders the same `.copier-answers.yml` as the template's own answers file), so never commit them. Every other file in the update should merge or stay unchanged; anything else is a real template change to review.
+Both would ship into every generated repo (the second renders the same `.copier-answers.yml` as the template's own answers file), so never commit them. Every other file in the update should merge or stay unchanged; anything else is a real template change to review.
