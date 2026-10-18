@@ -21,7 +21,7 @@ _message_after_copy: |
 
   Generated output (skills/, plugin and marketplace manifests) is not part of the
   template. Build it, then commit the result:
-    npm install && npm run generate
+    cd "{{ _copier_conf.dst_path }}" && npm install && npm run generate
 
   Run the same two commands after every `copier update`, once any conflicts
   are resolved.
