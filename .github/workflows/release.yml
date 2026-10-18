@@ -1,9 +1,12 @@
 name: Release
 
+# Never remove `workflow_dispatch`: it is the manual way to re-run the release
+# after a failure.
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions: {}
 
@@ -14,8 +17,10 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   release-please:
+    name: Release Please
     needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write # creates the tag and the GitHub release
       issues: write # release-please manages PR labels through the Issues API
@@ -27,7 +32,8 @@ jobs:
       # reopens it (ci.yml runs on `reopened`). The repository setting "Allow
       # GitHub Actions to create and approve pull requests" must be on. The tag
       # it creates (v0.1.0, ...) is what `copier update` resolves against.
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - name: Release Please
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
