@@ -1,9 +1,0 @@
-{
-  "name": "copier-skill-repo",
-  "private": true,
-  "type": "module",
-  "description": "Copier template for skill repos. This package.json only runs the template's own tests.",
-  "scripts": {
-    "test": "node --test \"tests/**/*.test.mjs\""
-  }
-}

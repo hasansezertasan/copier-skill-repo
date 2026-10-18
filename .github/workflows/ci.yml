@@ -24,4 +24,4 @@ jobs:
       - run: node template/scripts/check-repo.mjs
       # Renders every matrix entry (defaults, publish off, non-default placeholder
       # skill) and runs the update test; any failure fails the job.
-      - run: npm test
+      - run: node --test "tests/**/*.test.mjs"

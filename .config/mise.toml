@@ -9,7 +9,7 @@ copier = "9.18.2"
 
 [tasks.test]
 description = "Run the template test suite"
-run = "npm test"
+run = "node --test \"tests/**/*.test.mjs\""
 
 [tasks.cobo-check]
 description = "Check cobo-managed files for drift from their upstream sources"
