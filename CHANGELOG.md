@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.5.0...v0.5.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* record a full git URL as _src_path so Renovate can track template updates ([#65](https://github.com/hasansezertasan/copier-skill-repo/issues/65)) ([3a0b779](https://github.com/hasansezertasan/copier-skill-repo/commit/3a0b779471ec7a56bc6293dc916039d2b8154944))
+
 ## [0.5.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.4.2...v0.5.0) (2026-10-18)
 
 
