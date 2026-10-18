@@ -1,0 +1,16 @@
+# Tools for this repo's own tests and CI (the template ships none of this).
+# Renovate's mise manager reads the pins here.
+[tools]
+node = "24"
+uv = "0.13.1"
+copier = "9.18.2"
+# cobo generates the sealed boilerplate blocks (.gitignore, .gitattributes, .editorconfig).
+"pipx:cobo" = "0.6.0"
+
+[tasks.test]
+description = "Run the template test suite"
+run = "npm test"
+
+[tasks.cobo-check]
+description = "Check cobo-managed files for drift from their upstream sources"
+run = "mise exec -- cobo update && mise exec -- cobo check --strict"

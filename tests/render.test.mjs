@@ -28,7 +28,9 @@ function scratchDir() {
 
 // Render from a plain copy of the working tree so the result never depends on
 // git tags, HEAD or uncommitted changes in this checkout.
-function render(data, destName, extraArgs = []) {
+// The template has no `_tasks`, so the generate step a user runs after the copy
+// runs here too, unless the caller only wants Copier's own answers validation.
+function render(data, destName, extraArgs = [], { captureStderr = extraArgs.length > 0, generate = true } = {}) {
   const source = scratchDir();
   cpSync(join(templateRoot, "copier.yml"), join(source, "copier.yml"));
   cpSync(join(templateRoot, "template"), join(source, "template"), { recursive: true });
@@ -39,21 +41,26 @@ function render(data, destName, extraArgs = []) {
   // the command-line parser first.
   const dataFile = join(scratchDir(), "answers.json");
   writeFileSync(dataFile, JSON.stringify(data));
-  execFileSync("copier", ["copy", "--defaults", "--trust", "--quiet", ...extraArgs, "--data-file", dataFile, source, dest], {
+  execFileSync("copier", ["copy", "--defaults", "--quiet", ...extraArgs, "--data-file", dataFile, source, dest], {
     env: scratchEnv(),
-    stdio: extraArgs.length ? ["ignore", "ignore", "pipe"] : "inherit",
+    stdio: captureStderr ? ["ignore", "ignore", "pipe"] : "inherit",
     timeout: FIVE_MINUTES,
   });
+  if (generate) {
+    const options = { cwd: dest, env: scratchEnv(), stdio: "inherit", timeout: FIVE_MINUTES };
+    execFileSync("npm", ["install"], options);
+    execFileSync("npm", ["run", "generate"], options);
+  }
   return dest;
 }
 
-// Renders with tasks skipped, so only Copier's own prompt-time validation can
-// reject the answers, never the later `npm run generate`, and checks that the
-// rejection names the expected question.
+// Rejects at the copy, before any generate step runs, so only Copier's own
+// prompt-time validation can reject the answers, and checks that the rejection
+// names the expected question.
 function assertRejected(question, overrides) {
   const answers = { repo_name: "demo-skills", description: "Demo.", ...overrides };
   assert.throws(
-    () => render(answers, undefined, ["--skip-tasks"]),
+    () => render(answers, undefined, [], { captureStderr: true }),
     (error) => String(error.stderr).includes(`Validation error for question '${question}'`),
   );
 }
@@ -849,7 +856,7 @@ describe("copier update", () => {
     const dataFile = join(scratchDir(), "answers.json");
     writeFileSync(dataFile, JSON.stringify({ repo_name: "demo-skills", description: "Demo." }));
     const copier = (args, cwd) =>
-      execFileSync("copier", [...args, "--defaults", "--trust", "--skip-tasks"], {
+      execFileSync("copier", [...args, "--defaults"], {
         cwd,
         env: scratchEnv(),
         stdio: "pipe",
@@ -950,7 +957,7 @@ describe("package.json layout", () => {
   ]) {
     test(`is unchanged by generation for ${JSON.stringify(answers)}`, () => {
       const data = { repo_name: "demo-skills", description: "Demo.", ...answers };
-      const unGenerated = readFileSync(join(render(data, "demo-skills", ["--skip-tasks"]), "package.json"), "utf8");
+      const unGenerated = readFileSync(join(render(data, "demo-skills", [], { generate: false }), "package.json"), "utf8");
       const generated = readFileSync(join(render(data, "demo-skills"), "package.json"), "utf8");
       assert.equal(unGenerated, generated);
     });

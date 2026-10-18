@@ -1,0 +1,37 @@
+---
+name: Cobo Drift Check
+# Runs `cobo check` to detect when the cobo-managed files tracked in cobo.lock
+# (.gitignore, .gitattributes, .editorconfig) have drifted from their upstream
+# templates. `cobo update` hits the network and is inherently flaky, so this runs
+# on a weekly schedule and on demand, never on pull_request. A failure is a
+# maintenance signal (regenerate with `cobo update && cobo sync`), not a merge
+# blocker.
+"on":
+  workflow_dispatch:
+  schedule:
+    # Weekly, Monday 07:00 UTC.
+    - cron: "0 7 * * 1"
+permissions: {}
+jobs:
+  cobo-drift:
+    name: Check cobo drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # Runs the cobo pinned in .config/mise.toml, so Renovate's pin is the version tested here.
+      - name: Install mise
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
+        with:
+          install: false
+          cache: false
+      - name: Check for cobo drift
+        run: |
+          mise trust .config/mise.toml
+          mise install
+          mise run cobo-check

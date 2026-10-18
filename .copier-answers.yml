@@ -1,0 +1,10 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v0.1.0
+_src_path: gh:hasansezertasan/copier-copier
+author_email: hasansezertasan@gmail.com
+author_name: Hasan Sezer Tasan
+description: A Copier template for skill-repo.
+license: MIT
+owner: hasansezertasan
+python_version: '3.14'
+subject: skill-repo

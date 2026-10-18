@@ -13,7 +13,7 @@ Decisions from the design grilling session (2026-10-15). Terms are defined in `C
 ## Tooling
 
 - Source of truth is `.ai-rulez/`; ai-rulez v5 is pinned in `devDependencies`.
-- Generated output is committed and checked for drift in CI. A Copier `_tasks` entry runs `npm install && npm run generate` after rendering; nothing generated is stored in the template.
+- Generated output is committed and checked for drift in CI. The template has no `_tasks` (ADR 0004); a `_message_after_copy` asks the user to run `npm install && npm run generate` after rendering, and nothing generated is stored in the template.
 - Task runner is `package.json` scripts only (`npm run check`, `npm run generate`). Node comes from `.node-version`. No mise, no Makefile.
 - The version source is `package.json`, the one file release-please bumps. Pi installs from npm and needs the `pi-package` keyword and a `pi.skills` entry. ai-rulez owns those and the `files` allowlist (`[plugin.pi]` with `package_json = "merge"`), derived from the skills on disk, and the merge keeps the authored fields. ai-rulez rewrites the whole file (sorted keys, `"prompts": []`, `README.md` in `files`), so `package.json.jinja` is written in that exact form, with the placeholder skill's derived values, and a test proves generation leaves a fresh render unchanged; otherwise `copier update` conflicts with the generated file.
 - Helper scripts (release guard, repository check) are dependency-free `.mjs` files.
