@@ -29,11 +29,12 @@ jobs:
     steps:
       # Runs with the implicit GITHUB_TOKEN, as the generated repos do: a PAT or
       # App token would be a standing credential with write access to main.
-      # ci.yml runs on the release PR, but the two lint workflows use
-      # `pull_request_target`, which an event made by GITHUB_TOKEN does not fire,
-      # so the next step reports them. The repository setting "Allow GitHub
-      # Actions to create and approve pull requests" must be on. The tag it
-      # creates (v0.1.0, ...) is what `copier update` resolves against.
+      # ci.yml reports on the release PR (it runs on `pull_request`; seen on #68
+      # and #71), but the two lint workflows, which use `pull_request_target`, have
+      # not run for it until a person closed and reopened it, so the next step
+      # reports them. The repository setting "Allow GitHub Actions to create and
+      # approve pull requests" must be on. The tag it creates (v0.1.0, ...) is
+      # what `copier update` resolves against.
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
