@@ -58,13 +58,16 @@ jobs:
           title_pattern='^chore(\([a-z0-9-]+\))?: release( [a-z0-9._-]+)? [0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
           jq -c '.[]' <<<"$PRS" | while read -r pr; do
             number=$(jq -r '.number' <<<"$pr")
-            branch=$(jq -r '.headBranchName' <<<"$pr")
-            title=$(jq -r '.title' <<<"$pr")
+            # Read the live PR: the lint checks see what is on GitHub now, which
+            # a maintainer may have renamed since release-please generated it.
+            live=$(gh pr view "$number" --repo "$REPO" --json headRefName,title,headRefOid)
+            branch=$(jq -r '.headRefName' <<<"$live")
+            title=$(jq -r '.title' <<<"$live")
+            sha=$(jq -r '.headRefOid' <<<"$live")
             if [[ ! "$branch" =~ $branch_pattern || ! "$title" =~ $title_pattern ]]; then
               echo "::warning::PR #${number} is not a generated release PR; its lint checks are left to the lint workflows"
               continue
             fi
-            sha=$(gh pr view "$number" --repo "$REPO" --json headRefOid --jq '.headRefOid')
             for context in "Validate branch name" "Validate PR title"; do
               gh api "repos/${REPO}/statuses/${sha}" \
                 -f state=success \
