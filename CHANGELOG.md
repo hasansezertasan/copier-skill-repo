@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.6.1...v0.6.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* report the lint checks on the release PR ([#73](https://github.com/hasansezertasan/copier-skill-repo/issues/73)) ([21cf0cd](https://github.com/hasansezertasan/copier-skill-repo/commit/21cf0cd12608e314c8e85b9f0d87e6b06035b30d))
+
 ## [0.6.1](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.6.0...v0.6.1) (2026-10-19)
 
 
