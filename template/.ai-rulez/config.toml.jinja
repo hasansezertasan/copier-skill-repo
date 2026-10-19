@@ -21,6 +21,12 @@ gitignore = false
 # Keep the Antigravity $schema, and re-test when Codex changes. AR9T0 also
 # flags .mcp.json, hooks/ and the other host-loaded paths at the root, so
 # scripts/check-repo.mjs rejects those itself; keep its list in step with the rule.
+# Root skills/ is generated from .ai-rulez/skills/, so from ai-rulez 5.5 every skill
+# there is reported as a duplicate of its source (AR701, AR703). Drop findings for
+# the generated copies only; duplicates among the sources are still reported.
+[lint]
+ignore_paths = ["skills/**"]
+
 [lint.severity]
 AR9T0 = "off"
 
