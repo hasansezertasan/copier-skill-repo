@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.6.0...v0.6.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* ignore generated skills in ai-rulez validation ([#70](https://github.com/hasansezertasan/copier-skill-repo/issues/70)) ([dd85ae0](https://github.com/hasansezertasan/copier-skill-repo/commit/dd85ae08871e93fec602688a529c06696573c615))
+
 ## [0.6.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.5.1...v0.6.0) (2026-10-18)
 
 
