@@ -35,7 +35,7 @@ def test_passes_its_own_check_with_no_generated_output_drift(repo: Path) -> None
 
 def test_readme_links_back_to_the_template(repo: Path) -> None:
     assert read_text(repo / "README.md").rstrip().endswith(
-        "Generated from [copier-skill-repo](https://github.com/hasansezertasan/copier-skill-repo)."
+        "## Credits\n\nGenerated from [copier-skill-repo](https://github.com/hasansezertasan/copier-skill-repo)."
     )
 
 
