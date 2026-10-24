@@ -44,6 +44,7 @@ def updated(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
 
     # A second repo replaced the placeholder with its own skill and deleted it.
     shutil.rmtree(gone / ".ai-rulez/skills/hello")
+    (gone / ".gitignore").unlink()
     (gone / ".ai-rulez/skills/real").mkdir(parents=True)
     write_text(gone / ".ai-rulez/skills/real/SKILL.md", "---\nname: real\ndescription: Real.\n---\n")
     git_ok("add", "-A", cwd=gone)
@@ -108,7 +109,7 @@ def test_leaves_a_cobo_managed_gitignore_untouched(updated: tuple[Path, Path]) -
     repo, gone = updated
     assert read_text(repo / ".gitignore") == "# cobo-managed\n"
     assert not CONFLICT.search(read_text(repo / ".gitignore")), "no conflict markers"
-    assert (gone / ".gitignore").exists()
+    assert "# added in v1.1.0" in read_text(gone / ".gitignore"), "a deleted .gitignore is reseeded"
 
 
 def test_does_not_bring_back_a_placeholder_skill_the_repo_deleted(updated: tuple[Path, Path]) -> None:
