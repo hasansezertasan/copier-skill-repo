@@ -33,6 +33,12 @@ def test_passes_its_own_check_with_no_generated_output_drift(repo: Path) -> None
     install_and_check(repo)
 
 
+def test_readme_links_back_to_the_template(repo: Path) -> None:
+    assert read_text(repo / "README.md").rstrip().endswith(
+        "Generated from [copier-skill-repo](https://github.com/hasansezertasan/copier-skill-repo)."
+    )
+
+
 def test_ships_the_placeholder_skill_under_its_default_name(repo: Path) -> None:
     assert (repo / ".ai-rulez/skills/hello/SKILL.md").exists()
     assert (repo / "skills/hello/SKILL.md").exists()
