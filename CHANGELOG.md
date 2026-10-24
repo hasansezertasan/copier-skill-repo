@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.6.2...v0.7.0) (2026-10-24)
+
+
+### Features
+
+* add a back reference to the template in the generated README ([#75](https://github.com/hasansezertasan/copier-skill-repo/issues/75)) ([ffd6b59](https://github.com/hasansezertasan/copier-skill-repo/commit/ffd6b59b310d22bbdc18bec00e120aff0becbdb6))
+* leave the generated gitignore to the project ([#78](https://github.com/hasansezertasan/copier-skill-repo/issues/78)) ([d3ccd80](https://github.com/hasansezertasan/copier-skill-repo/commit/d3ccd8044d28075dc2557a4b6b0b3f1fa63e52f2))
+
 ## [0.6.2](https://github.com/hasansezertasan/copier-skill-repo/compare/v0.6.1...v0.6.2) (2026-10-19)
 
 
