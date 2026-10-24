@@ -57,6 +57,7 @@ def updated(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
     write_text(repo / ".ai-rulez/skills/real/SKILL.md", "---\nname: real\ndescription: Real.\n---\n")
     write_text(repo / "CHANGELOG.md", "# Changelog\n\n## 0.3.0\n")
     write_text(repo / ".release-please-manifest.json", '{ ".": "0.3.0" }\n')
+    write_text(repo / ".gitignore", "# cobo-managed\n")
     edit(repo, "package.json", '"version": "0.0.0"', '"version": "0.3.0"')
     edit(
         repo,
@@ -83,6 +84,7 @@ def updated(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
         "Template placeholder",
     )
     edit(source, "template/.release-please-manifest.json", '"0.0.0"', '"0.0.1"')
+    write_text(source / "template/.gitignore", f"{read_text(source / 'template/.gitignore')}# added in v1.1.0\n")
     git_ok("add", "-A", cwd=source)
     git_ok("commit", "-q", "-m", "later state", cwd=source)
     git_ok("tag", "v1.1.0", cwd=source)
@@ -100,6 +102,13 @@ def test_leaves_repo_owned_files_untouched(updated: tuple[Path, Path]) -> None:
     assert read_text(repo / "CHANGELOG.md") == "# Changelog\n\n## 0.3.0\n"
     assert read_json(repo / ".release-please-manifest.json") == {".": "0.3.0"}
     assert read_json(repo / "package.json")["version"] == "0.3.0"
+
+
+def test_leaves_a_cobo_managed_gitignore_untouched(updated: tuple[Path, Path]) -> None:
+    repo, gone = updated
+    assert read_text(repo / ".gitignore") == "# cobo-managed\n"
+    assert not CONFLICT.search(read_text(repo / ".gitignore")), "no conflict markers"
+    assert (gone / ".gitignore").exists()
 
 
 def test_does_not_bring_back_a_placeholder_skill_the_repo_deleted(updated: tuple[Path, Path]) -> None:

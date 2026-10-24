@@ -11,6 +11,8 @@ _answers_file: .copier-answers.yml
 # a deleted or rewritten placeholder alone and never touches the repo's own skills.
 _skip_if_exists:
   - .release-please-manifest.json
+  # Seeded once; cobo (cobo.lock) can take it over, so `copier update` must not merge into it.
+  - .gitignore
 
 # Generated output (skills/, plugin manifests, marketplace catalogs) is never
 # stored in the template. It is built by `npm run generate`, which the message
